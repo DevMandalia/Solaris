@@ -38,7 +38,7 @@ Inspired by the best ideas in [Linear](https://linear.app) (triage, cycles, heal
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install git+https://github.com/DevMandalia/solaris-board.git
+pip install git+https://github.com/DevMandalia/Solaris.git
 
 # or from a local clone
 pip install -e ".[dev]"
@@ -144,11 +144,12 @@ Global: `solaris-board --cwd DIR ...` or `export BOARD_ROOT=/path/to/instance`.
 ## Development
 
 ```bash
-git clone https://github.com/DevMandalia/solaris-board.git
-cd solaris-board
+git clone https://github.com/DevMandalia/Solaris.git
+cd Solaris
 pip install -e ".[dev]"
 pytest
 ```
+
 
 ## License
 
