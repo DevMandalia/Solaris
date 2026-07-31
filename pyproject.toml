@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "solaris-board"
+name = "solaris"
 version = "0.1.0"
 description = "Solaris — markdown-native project board for humans and AI agents"
 readme = "README.md"
@@ -40,8 +40,6 @@ Documentation = "https://github.com/DevMandalia/Solaris#readme"
 
 [project.scripts]
 solaris = "solaris.cli:main"
-# Compat alias
-solaris-board = "solaris.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
