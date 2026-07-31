@@ -37,13 +37,15 @@ Inspired by the best ideas in [Linear](https://linear.app) (triage, cycles, heal
 ## Install
 
 ```bash
+python3 -m venv .venv && source .venv/bin/activate
 pip install git+https://github.com/DevMandalia/solaris-board.git
 
 # or from a local clone
-pip install -e .
-
-# CLI: solaris-board   (or: python -m solaris)
+pip install -e ".[dev]"
 ```
+
+CLI entry point: **`solaris-board`** (also `python -m solaris`).  
+> The short name `solaris` is often taken on PATH by other tools — use `solaris-board`.
 
 Requires Python 3.10+.
 
