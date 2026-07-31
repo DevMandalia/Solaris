@@ -39,9 +39,9 @@ Issues = "https://github.com/DevMandalia/Solaris/issues"
 Documentation = "https://github.com/DevMandalia/Solaris#readme"
 
 [project.scripts]
+solaris = "solaris.cli:main"
+# Compat alias
 solaris-board = "solaris.cli:main"
-# Also: python -m solaris
-# Note: bare `solaris` often conflicts with other tools on PATH.
 
 [tool.setuptools.packages.find]
 where = ["src"]

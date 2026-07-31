@@ -55,7 +55,7 @@ def init_board(
     shutil.copytree(share / "base", system / "base")
     (system / "generated").mkdir(exist_ok=True)
     (system / "generated" / "initiative-progress.md").write_text(
-        "<!-- solaris-generated: run `solaris-board rollup` -->\n\n"
+        "<!-- solaris-generated: run `solaris rollup` -->\n\n"
         "| Initiative | Done | Open | Blocked |\n"
         "|------------|-----:|-----:|--------:|\n"
         "| _(none)_ | 0 | 0 | 0 |\n",
@@ -216,7 +216,7 @@ This repo uses **Solaris** (markdown project board).
 
 1. Read `Board/_system/AGENT-CONTEXT.md`
 2. Read `Board/INSTANCE.md`
-3. Prefer CLI: `solaris-board task create|move|edit|list` (set `BOARD_ROOT` to this repo root)
+3. Prefer CLI: `solaris task create|move|edit|list` (set `BOARD_ROOT` to this repo root)
 
 Do not put `source: agent` tasks in triage. After a plan is approved, create tickets and move lanes automatically.
 """,
@@ -246,7 +246,7 @@ def main(argv: list[str] | None = None) -> int:
     print("Next:")
     print(f"  export BOARD_ROOT={root}")
     print(
-        f'  solaris-board task create --title "First task" --project "{project}" --build'
+        f'  solaris task create --title "First task" --project "{project}" --build'
     )
     return 0
 

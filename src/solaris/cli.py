@@ -96,7 +96,7 @@ def _print_help() -> None:
         """Solaris — markdown-native project board for humans and AI agents
 
 Usage:
-  solaris-board [--cwd DIR] <command> ...
+  solaris [--cwd DIR] <command> ...
   python -m solaris [--cwd DIR] <command> ...
 
 Commands:
@@ -108,11 +108,11 @@ Commands:
   rollup     Initiative progress_* counts
 
 Examples:
-  solaris-board init --name MyApp --project Eng
+  solaris init --name MyApp --project Eng
   export BOARD_ROOT=$PWD
-  solaris-board task create --title "Ship CLI" --project Eng --build
-  solaris-board task move ship-cli --lane "in progress now"
-  solaris-board export --include-done
+  solaris task create --title "Ship CLI" --project Eng --build
+  solaris task move ship-cli --lane "in progress now"
+  solaris export --include-done
 """
     )
 

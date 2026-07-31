@@ -2,8 +2,8 @@
 
 ```bash
 pip install -e ../..
-solaris-board init --root . --name Minimal --project Eng --force
+solaris init --root . --name Minimal --project Eng --force
 export BOARD_ROOT=$PWD
-solaris-board task create --title "Hello" --project Eng --build
-solaris-board export
+solaris task create --title "Hello" --project Eng --build
+solaris export
 ```

@@ -38,14 +38,15 @@ Inspired by the best ideas in [Linear](https://linear.app) (triage, cycles, heal
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install git+https://github.com/DevMandalia/Solaris.git
+pip install "git+https://github.com/DevMandalia/Solaris.git"
 
 # or from a local clone
 pip install -e ".[dev]"
 ```
 
-CLI entry point: **`solaris-board`** (also `python -m solaris`).  
-> The short name `solaris` is often taken on PATH by other tools — use `solaris-board`.
+CLI: **`solaris`** (also `python -m solaris`).  
+The note-taking agent uses **`solaris-agent`** (`hermes -p solaris`).
+
 
 Requires Python 3.10+.
 
@@ -53,26 +54,26 @@ Requires Python 3.10+.
 
 ```bash
 # In any project directory
-solaris-board init --name MyApp --project Eng
+solaris init --name MyApp --project Eng
 export BOARD_ROOT=$PWD
 
-solaris-board task create --title "Add auth" --project Eng --build \
+solaris task create --title "Add auth" --project Eng --build \
   --lane "doing this week" --phase mvp
-solaris-board task move add-auth --lane "in progress now"
+solaris task move add-auth --lane "in progress now"
 # ... do the work ...
-solaris-board task move add-auth --lane done
+solaris task move add-auth --lane done
 
-solaris-board export --include-done
+solaris export --include-done
 ```
 
 ### Vault mode (Obsidian)
 
-`solaris-board init` writes `Board/Board.base`, templates, Dashboard, and agent docs.
+`solaris init` writes `Board/Board.base`, templates, Dashboard, and agent docs.
 Open the folder as an Obsidian vault (or add `Board/` to an existing vault) and use the Flow / Triage views.
 
 ### Repo mode (no Obsidian)
 
-Use the CLI only. Commit `Board/` with your code. `solaris-board export` prints a markdown kanban for PRs and status updates.
+Use the CLI only. Commit `Board/` with your code. `solaris export` prints a markdown kanban for PRs and status updates.
 
 ## How it works
 
@@ -97,7 +98,7 @@ Board/
 ## Agent loop (automatic)
 
 1. You approve a multi-step plan (“execute”).
-2. Agent runs `solaris-board task create` for each unit (`source: agent`).
+2. Agent runs `solaris task create` for each unit (`source: agent`).
 3. As it works: `move` → `in progress now` → `done`.
 4. History = task files + git. No per-ticket human gate.
 
@@ -118,18 +119,18 @@ Details: [docs/safety.md](docs/safety.md).
 ## CLI reference
 
 ```
-solaris-board init [--root DIR] [--name NAME] [--project NAME] [--force]
-solaris-board task create --title T --project P [--build] [--lane L] [--phase X]
-solaris-board task move <slug|path> --lane LANE
-solaris-board task edit <slug|path> [--plan ...] [--append-log ...]
-solaris-board task list [--lane L] [--phase X] [--project P]
-solaris-board export [-o file.md] [--include-done] [--include-archived]
-solaris-board sync
-solaris-board rollover [--dry-run] [--force]
-solaris-board rollup [--dry-run] [--force]
+solaris init [--root DIR] [--name NAME] [--project NAME] [--force]
+solaris task create --title T --project P [--build] [--lane L] [--phase X]
+solaris task move <slug|path> --lane LANE
+solaris task edit <slug|path> [--plan ...] [--append-log ...]
+solaris task list [--lane L] [--phase X] [--project P]
+solaris export [-o file.md] [--include-done] [--include-archived]
+solaris sync
+solaris rollover [--dry-run] [--force]
+solaris rollup [--dry-run] [--force]
 ```
 
-Global: `solaris-board --cwd DIR ...` or `export BOARD_ROOT=/path/to/instance`.
+Global: `solaris --cwd DIR ...` or `export BOARD_ROOT=/path/to/instance`.
 
 ## Concepts
 

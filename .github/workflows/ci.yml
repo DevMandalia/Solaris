@@ -22,8 +22,8 @@ jobs:
         run: pytest -q
       - name: CLI smoke
         run: |
-          solaris-board init --root /tmp/solaris-ci --name CI --project Eng
+          solaris init --root /tmp/solaris-ci --name CI --project Eng
           export BOARD_ROOT=/tmp/solaris-ci
-          solaris-board task create --title "CI task" --project Eng --build
-          solaris-board task move ci-task --lane done
-          solaris-board export --include-done | head -20
+          solaris task create --title "CI task" --project Eng --build
+          solaris task move ci-task --lane done
+          solaris export --include-done | head -20
