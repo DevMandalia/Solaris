@@ -1,0 +1,87 @@
+filters:
+  and:
+    - file.inFolder("Board/Tasks")
+    - type == "task"
+formulas:
+  priority_rank: if(priority == "P0", 0, if(priority == "P1", 1, if(priority == "P2", 2, if(priority == "P3", 3, 4))))
+properties:
+  title:
+    displayName: Task
+  lane:
+    displayName: Lane
+  project:
+    displayName: Epic
+  priority:
+    displayName: Priority
+  kanban_order:
+    displayName: Order
+  sprint:
+    displayName: Sprint
+  carry:
+    displayName: Carry
+  phase:
+    displayName: Phase
+  source:
+    displayName: Source
+  updated:
+    displayName: Updated
+views:
+  - type: kanban
+    name: Flow
+    filters:
+      and:
+        - lane != "done"
+        - lane != "archived"
+        - lane != "triage"
+        - phase != "icebox"
+    groupBy:
+      property: lane
+      direction: ASC
+    order:
+      - kanban_order
+      - title
+    cardTitleProperty: note.title
+  - type: table
+    name: Triage
+    filters:
+      and:
+        - lane == "triage"
+    order:
+      - updated
+      - title
+  - type: table
+    name: Carried over
+    filters:
+      and:
+        - carry == true
+        - lane != "done"
+        - lane != "archived"
+    order:
+      - kanban_order
+      - title
+  - type: table
+    name: Blocked aging
+    filters:
+      and:
+        - lane == "blocked"
+    order:
+      - updated
+      - title
+  - type: table
+    name: All open
+    filters:
+      and:
+        - lane != "done"
+        - lane != "archived"
+    order:
+      - carry
+      - kanban_order
+      - title
+  - type: table
+    name: Done
+    filters:
+      and:
+        - lane == "done"
+    order:
+      - updated
+    orderDirection: DESC

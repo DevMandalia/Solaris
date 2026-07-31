@@ -1,0 +1,20 @@
+
+# Local smoke boards
+*.egg-info/
+*.py[cod]
+*.swp
+.DS_Store
+.coverage
+.eggs/
+.env
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+/smoke-*/
+/tmp-board/
+__pycache__/
+build/
+dist/
+htmlcov/
+venv/
