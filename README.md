@@ -21,9 +21,10 @@
 > Tasks are plain Markdown. Agents create tickets and move them as they work.
 > You approve the plan once — not every card.
 
-Inspired by the best ideas in [Linear](https://linear.app) (triage, cycles, health),
-[Plane](https://plane.so) (intake, initiatives), and [Backlog.md](https://github.com/MrLesk/Backlog.md)
-(acceptance criteria + agent ledger) — without their runtimes or lock-in.
+**Solaris** = *Sol* (the Sun) + *Polaris* (the North Star). For millennia those two lights
+guided travellers and world-builders — Sol by day, Polaris by night.
+
+Solaris keeps you on course, day and night.
 
 ## Why Solaris
 
