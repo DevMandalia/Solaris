@@ -4,6 +4,8 @@ A cool, techy theme. Dark mode is cyan + violet on a blue-black canvas;
 light mode is the same accents on cool paper. Interface and editor text
 use **Sora**; code uses **JetBrains Mono**.
 
+Run the mission with [Solaris](https://github.com/DevMandalia/Solaris) — free, open source, markdown-native, local-first boards for you and your agents.
+
 | Dark | Light |
 |------|-------|
 | ![Dark kanban](screenshots/dark-kanban.png) | ![Light kanban](screenshots/light-kanban.png) |
