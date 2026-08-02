@@ -26,6 +26,11 @@ guided travellers and world-builders — Sol by day, Polaris by night.
 
 Solaris keeps you on course, day and night.
 
+| Dark | Light |
+|------|-------|
+| ![Dark kanban](src/solaris/data/obsidian/themes/Nebula/screenshots/dark-kanban.png) | ![Light kanban](src/solaris/data/obsidian/themes/Nebula/screenshots/light-kanban.png) |
+| ![Dark dashboard](src/solaris/data/obsidian/themes/Nebula/screenshots/dark-dashboard.png) | ![Light dashboard](src/solaris/data/obsidian/themes/Nebula/screenshots/light-dashboard.png) |
+
 ## Why Solaris
 
 | Problem | Solaris |
