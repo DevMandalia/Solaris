@@ -1,9 +1,11 @@
 <p align="center">
-  <h1 align="center">Solaris</h1>
-  <p align="center">
-    <strong>Markdown-native project board for humans and AI agents</strong><br/>
-    Local-first · Git-friendly · Obsidian-ready · Zero SaaS
-  </p>
+  <img src="docs/assets/solaris-logo-light.png#gh-light-mode-only" alt="Solaris" width="560">
+  <img src="docs/assets/solaris-logo-dark.png#gh-dark-mode-only" alt="Solaris" width="560">
+</p>
+
+<p align="center">
+  <strong>Markdown-native project board for humans and AI agents</strong><br/>
+  Local-first · Git-friendly · Obsidian-ready · Zero SaaS
 </p>
 
 <p align="center">
