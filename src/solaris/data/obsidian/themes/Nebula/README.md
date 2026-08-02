@@ -4,6 +4,11 @@ A cool, techy theme. Dark mode is cyan + violet on a blue-black canvas;
 light mode is the same accents on cool paper. Interface and editor text
 use **Sora**; code uses **JetBrains Mono**.
 
+| Dark | Light |
+|------|-------|
+| ![Dark kanban](screenshots/dark-kanban.png) | ![Light kanban](screenshots/light-kanban.png) |
+| ![Dark dashboard](screenshots/dark-dashboard.png) | ![Light dashboard](screenshots/light-dashboard.png) |
+
 ## Install (manual)
 
 1. In your vault, open the folder:
@@ -27,5 +32,4 @@ use **Sora**; code uses **JetBrains Mono**.
 - Fonts load from Google Fonts via `@import`, so they need an internet
   connection. To go fully offline, download the font `.woff2` files into
   this folder and swap the `@import` for `@font-face` rules.
-- Before sharing publicly, set `author` (and optionally `authorUrl`) in
-  `manifest.json`.
+- Published at [DevMandalia/Nebula](https://github.com/DevMandalia/Nebula).
