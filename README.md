@@ -1,6 +1,6 @@
 <p align="center">
-  <img src="docs/assets/solaris-logo-light.svg#gh-light-mode-only" alt="Solaris" width="560">
-  <img src="docs/assets/solaris-logo-dark.svg#gh-dark-mode-only" alt="Solaris" width="560">
+  <img src="docs/assets/solaris-logo-light.png#gh-light-mode-only" alt="Solaris" width="560">
+  <img src="docs/assets/solaris-logo-dark.png#gh-dark-mode-only" alt="Solaris" width="560">
 </p>
 
 <p align="center">
