@@ -22,8 +22,11 @@ jobs:
         run: pytest -q
       - name: CLI smoke
         run: |
-          solaris init --root /tmp/solaris-ci --name CI --project Eng
-          export BOARD_ROOT=/tmp/solaris-ci
-          solaris task create --title "CI task" --project Eng --build
+          ROOT=/tmp/solaris-ci-${{ matrix.python-version }}
+          solaris init --root "$ROOT" --name CI --project Eng
+          export BOARD_ROOT="$ROOT"
+          solaris agent register --id ci-bot --name "CI Bot" --model test --owner CI
+          solaris agent plan-open --agent ci-bot --title "CI smoke" --project Eng --plan-id ci-smoke
+          solaris task create --title "CI task" --project Eng --build --agent ci-bot --plan-id ci-smoke
           solaris task move ci-task --lane done
           solaris export --include-done | head -20
