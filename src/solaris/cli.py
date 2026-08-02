@@ -74,8 +74,17 @@ def main(argv: list[str] | None = None) -> int:
         ap = argparse.ArgumentParser(prog="solaris rollover")
         ap.add_argument("--dry-run", action="store_true")
         ap.add_argument("--force", action="store_true")
+        ap.add_argument(
+            "--seed-current",
+            action="store_true",
+            help="Create current week Sprints/ folder + Sprint.md + Home filter",
+        )
         args = ap.parse_args(rest)
-        return run(dry_run=args.dry_run, force=args.force)
+        return run(
+            dry_run=args.dry_run,
+            force=args.force,
+            seed_only=args.seed_current,
+        )
 
     if cmd == "rollup":
         from solaris.rollup import run
@@ -85,6 +94,16 @@ def main(argv: list[str] | None = None) -> int:
         ap.add_argument("--force", action="store_true")
         args = ap.parse_args(rest)
         return run(dry_run=args.dry_run, force=args.force)
+
+    if cmd == "agent":
+        from solaris import agent_cmd
+
+        old = sys.argv
+        try:
+            sys.argv = ["solaris-agent", *rest]
+            return agent_cmd.main()
+        finally:
+            sys.argv = old
 
     print(f"Unknown command: {cmd}", file=sys.stderr)
     _print_help()
@@ -100,8 +119,9 @@ Usage:
   python -m solaris [--cwd DIR] <command> ...
 
 Commands:
-  init       Scaffold Board/ in a directory or git repo
+  init       Scaffold <board_dir>/ (default: repo basename) + Wiki/Notes/Welcome
   task       create | move | edit | list
+  agent      register | plan-open | plan-close | session-bind | gate-status | dashboard | list
   export     Markdown kanban snapshot
   sync       Sync lane → sprint/status fields
   rollover   Safe ISO-week sprint rollover
@@ -110,7 +130,9 @@ Commands:
 Examples:
   solaris init --name MyApp --project Eng
   export BOARD_ROOT=$PWD
-  solaris task create --title "Ship CLI" --project Eng --build
+  solaris agent register --id my-bot --name "My Bot" --model gpt --owner You
+  solaris agent plan-open --agent my-bot --title "Ship CLI" --project Eng
+  solaris task create --title "Ship CLI" --project Eng --build --agent my-bot --plan-id <id>
   solaris task move ship-cli --lane "in progress now"
   solaris export --include-done
 """

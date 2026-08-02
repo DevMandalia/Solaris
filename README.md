@@ -36,6 +36,8 @@ Inspired by the best ideas in [Linear](https://linear.app) (triage, cycles, heal
 
 ## Install
 
+### 1. Solaris CLI (required)
+
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install "git+https://github.com/DevMandalia/Solaris.git"
@@ -45,48 +47,89 @@ pip install -e ".[dev]"
 ```
 
 CLI: **`solaris`** (also `python -m solaris`).  
-The note-taking agent uses **`solaris-agent`** (`hermes -p solaris`).
-
-
 Requires Python 3.10+.
+
+### 2. Obsidian app (optional — for the kanban UI)
+
+Solaris does **not** install the Obsidian desktop app. Install it yourself, then open the repo as a vault.
+
+| OS | Install |
+|----|---------|
+| **macOS** | [Download](https://obsidian.md/download) or `brew install --cask obsidian` |
+| **Windows** | [Download](https://obsidian.md/download) (installer / Windows Store) |
+| **Linux** | [Download](https://obsidian.md/download) (AppImage / Flatpak / community packages) |
+
+Use **Obsidian 1.10+** so the core **Bases** feature is available (Base Board depends on it).
+
+The separate note-taking agent uses **`solaris-agent`** (`hermes -p solaris`) — unrelated to the board CLI.
 
 ## Quick start
 
 ```bash
 # In any project directory
-solaris init --name MyApp --project Eng
+solaris init --name MyApp --project Eng --obsidian
 export BOARD_ROOT=$PWD
 
+# If you used --obsidian: install Obsidian.app (above), then
+# Obsidian → Open folder as vault → this directory
+# Allow community plugins if prompted (Base Board). Theme: Nebula.
+
+solaris agent register --id my-bot --name "My Bot" --model gpt --owner You
+solaris agent plan-open --agent my-bot --title "Add auth" --project Eng
+# note the plan_id printed, then:
 solaris task create --title "Add auth" --project Eng --build \
-  --lane "doing this week" --phase mvp
+  --agent my-bot --plan-id <plan_id> --lane "doing this week"
 solaris task move add-auth --lane "in progress now"
 # ... do the work ...
 solaris task move add-auth --lane done
+solaris agent plan-close <plan_id> --lines-added 120 --lines-removed 10 --prs 1
 
 solaris export --include-done
 ```
 
 ### Vault mode (Obsidian)
 
-`solaris init` writes `Board/Board.base`, templates, Dashboard, and agent docs.
-Open the folder as an Obsidian vault (or add `Board/` to an existing vault) and use the Flow / Triage views.
+```bash
+solaris init --name MyApp --project Eng --obsidian
+```
+
+Creates the board files **plus** `.obsidian/` with:
+
+- **Bases** (core plugin) enabled  
+- **Base Board** community plugin vendored  
+- **Nebula** theme selected  
+
+Then install Obsidian.app (see above) → **Open folder as vault** on the repo root → open `<board_dir>/Home.base` / Dashboard.
+
+Without `--obsidian`, you still get markdown + `Home.base`; open the folder as a vault manually and install plugins/themes yourself.
 
 ### Repo mode (no Obsidian)
 
-Use the CLI only. Commit `Board/` with your code. `solaris export` prints a markdown kanban for PRs and status updates.
+```bash
+solaris init --name MyApp --project Eng   # omit --obsidian
+```
+
+Use the CLI only. Commit `<board_dir>/` with your code. `solaris export` prints a markdown kanban for PRs and status updates.  
+Override folder name with `--board-dir Board` if you want the legacy name.
 
 ## How it works
 
 ```
-Board/
-  config.yml           # instance: projects, feature flags
-  Tasks/<Project>/     # one .md file per task
-  Projects/            # project hubs
-  Sprint.md            # active ISO week
-  _system/             # portable schema + templates (vendored on init)
-  Humans.md            # human operating manual
+<repo>/                         # BOARD_ROOT (= Obsidian vault root if using UI)
+  .obsidian/                    # only with --obsidian (Bases, Base Board, Nebula)
+  <board_dir>/                  # default: basename of repo (or Board)
+    config.yml                  # board_dir, projects, feature flags
+    Home.base                   # Obsidian kanban (Home, Triage, Agent work)
+    Dashboard.md                # command center + WTFAQs
+    Agents/                     # entry, INSTANCE, Agents Dashboard, profiles
+    Tasks/<Project>/            # one .md file per task
+    Sprints/                    # weekly archive + index.md (active_sprint)
+    _system/                    # portable schema + templates (vendored on init)
+  Wiki/<Project>/index.md
+  Notes/
+  Welcome.md
+  To Do.md
 ```
-
 **Lanes:** `triage` → `backlog` → `doing this week` → `in progress now` → `blocked` → `done` / `archived`
 
 | Source | Triage? |
@@ -97,10 +140,13 @@ Board/
 
 ## Agent loop (automatic)
 
-1. You approve a multi-step plan (“execute”).
-2. Agent runs `solaris task create` for each unit (`source: agent`).
-3. As it works: `move` → `in progress now` → `done`.
-4. History = task files + git. No per-ticket human gate.
+1. Agent **registers** a persistent profile (`solaris agent register`) before any code.
+2. You approve a multi-step plan (“execute”).
+3. Agent **opens a plan** (`plan-open`, auto session-bind) — wiki plan + ledger — then `task create` with `--agent` / `--plan-id`.
+4. Cursor hook / `solaris agent gate-status` blocks other edits until register + plan + todos are in place.
+5. As it works: `move` → `in progress now` → `done` (visible on Home.base → Agent work).
+6. Agent **closes the plan** with self-reported LOC/PR metrics.
+7. History = agent profiles + plan ledgers + task files + git. No per-ticket human gate.
 
 See [docs/agents.md](docs/agents.md).
 
@@ -113,6 +159,7 @@ Daily triage, weekly planning/review, WIP — [docs/humans.md](docs/humans.md).
 - Sprint rollover **aborts** if the ISO week gap is larger than configured (no mass-carry disasters).
 - Feature flags default conservative (`sprint_rollover` / `initiative_rollup` off until you enable them).
 - Rollup writes only `progress_*` keys — never initiative body or health.
+- Cursor **agent-board-gate** (installed by `init`) fail-closes mutations until the agent loop prerequisites are met; Hermes uses `solaris agent gate-status` as preflight.
 
 Details: [docs/safety.md](docs/safety.md).
 
@@ -120,10 +167,15 @@ Details: [docs/safety.md](docs/safety.md).
 
 ```
 solaris init [--root DIR] [--name NAME] [--project NAME] [--force]
-solaris task create --title T --project P [--build] [--lane L] [--phase X]
+solaris agent register --id ID --name N --model M --owner O
+solaris agent plan-open --agent ID --title T --project P [--initiative-id I]
+solaris agent plan-close PLAN_ID --lines-added N --lines-removed N --prs N
+solaris agent gate-status | session-bind --plan-id ID | session-unbind
+solaris agent dashboard | list [--plans] [--open]
+solaris task create --title T --project P [--build] [--agent ID] [--plan-id P]
 solaris task move <slug|path> --lane LANE
 solaris task edit <slug|path> [--plan ...] [--append-log ...]
-solaris task list [--lane L] [--phase X] [--project P]
+solaris task list [--lane L] [--phase X] [--project P] [--agent ID]
 solaris export [-o file.md] [--include-done] [--include-archived]
 solaris sync
 solaris rollover [--dry-run] [--force]

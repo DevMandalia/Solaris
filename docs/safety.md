@@ -9,6 +9,7 @@ Guards that keep automation from corrupting an instance. Enforced in tools + con
 | `features.triage` | Intake lane available | Low |
 | `features.sprint_rollover` | **Off** until `active_sprint` is correct | Mass `carry: true` + wrong week |
 | `features.initiative_rollup` | Progress counts only | Noisy commits if wiki busy |
+| `features.agent_registry` | Require `agent_id` + `plan_id` on `source: agent` creates | Agents blocked until registered |
 
 Nightly hooks must treat exit code **2** (flag off) as success/no-op.
 
@@ -33,6 +34,16 @@ Never auto-heal a multi-week stale sprint. Fix `Board/Sprint.md` manually first.
 
 Enforced in `board_task.py` create/move.
 
+## Agent registry
+
+When `features.agent_registry` is on:
+
+- `board_task.py create --source agent` requires a registered `--agent` and an open `--plan-id`.
+- Plan files live under the **project/initiative wiki** (`Wiki/<Project>/Plans/` or `…/Initiatives/<id>/Plans/`), not under `Board/Agents/`.
+- Plan close metrics (`lines_added` / `lines_removed` / `prs`) are **self-reported** — tools do not scrape git in v1.
+- Agent rollup counters on `Board/Agents/<id>.md` are tool-owned (written by `plan-close`).
+- Agents Dashboard lives at `Board/Agents Dashboard.md` (regenerated roster).
+
 ## No mass migrate
 
 - Existing tasks are not bulk-moved into `triage`.
@@ -55,3 +66,5 @@ Do not read/write instance `To Do.md` (or equivalent legacy ledgers). Board task
 ## Agent loop
 
 After plan approval: create tickets and move lanes automatically. Do not block on per-ticket human review. Prefer `board_task.py` over hand-edited YAML.
+
+> See packaged seed: `src/solaris/data/docs/SAFETY.md` (agent-board-gate).

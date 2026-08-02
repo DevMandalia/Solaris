@@ -31,13 +31,15 @@ properties:
     displayName: Updated
 views:
   - type: kanban
-    name: Flow
+    name: Home
     filters:
       and:
-        - lane != "done"
         - lane != "archived"
         - lane != "triage"
         - phase != "icebox"
+        - or:
+            - lane != "done"
+            - sprint == "2026-W31"
     groupBy:
       property: lane
       direction: ASC
@@ -45,6 +47,35 @@ views:
       - kanban_order
       - title
     cardTitleProperty: note.title
+    boardColumns:
+      - backlog
+      - doing this week
+      - in progress now
+      - blocked
+      - done
+  - type: kanban
+    name: Flow
+    filters:
+      and:
+        - lane != "archived"
+        - lane != "triage"
+        - phase != "icebox"
+        - or:
+            - lane != "done"
+            - sprint == "2026-W31"
+    groupBy:
+      property: lane
+      direction: ASC
+    order:
+      - kanban_order
+      - title
+    cardTitleProperty: note.title
+    boardColumns:
+      - backlog
+      - doing this week
+      - in progress now
+      - blocked
+      - done
   - type: table
     name: Triage
     filters:
@@ -94,6 +125,11 @@ views:
       - kanban_order
       - title
     cardTitleProperty: note.title
+    boardColumns:
+      - todo
+      - in-progress
+      - blocked
+      - done
   - type: kanban
     name: By agent
     filters:

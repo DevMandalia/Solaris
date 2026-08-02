@@ -52,8 +52,9 @@ try:
     _refresh_globals()
 except Exception:
     VAULT = Path.cwd()
-    TASKS_ROOT = VAULT / "Board" / "Tasks"
-    SPRINT_NOTE = VAULT / "Board" / "Sprint.md"
+    _bd = VAULT.name if (VAULT / VAULT.name / "config.yml").is_file() else "Board"
+    TASKS_ROOT = VAULT / _bd / "Tasks"
+    SPRINT_NOTE = VAULT / _bd / "Sprints" / "index.md"
     FOLDER_TO_PROJECT = {}
     PROJECT_FILTER_TAG = {}
     LEGACY_FILTER_TAGS = frozenset()

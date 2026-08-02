@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "python3 .cursor/hooks/agent-board-gate.py",
+        "failClosed": false
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "python3 .cursor/hooks/agent-board-gate.py",
+        "failClosed": false
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "python3 .cursor/hooks/agent-board-gate.py",
+        "failClosed": true
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "python3 .cursor/hooks/agent-board-gate.py",
+        "failClosed": false
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "python3 .cursor/hooks/agent-board-gate.py",
+        "failClosed": true
+      }
+    ]
+  }
+}

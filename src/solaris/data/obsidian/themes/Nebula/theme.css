@@ -1,0 +1,252 @@
+/* ============================================================
+   NEBULA  —  a cool, techy theme for Obsidian
+   Dark: cyan + violet on blue-black  ·  Light: cool paper
+   Type: Sora (interface + text), JetBrains Mono (code)
+   ============================================================ */
+
+/* ---- Fonts (loaded from Google Fonts; requires internet) ----
+   To bundle offline instead, download the .woff2 files into the
+   theme folder and replace these @import lines with @font-face. */
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+body {
+  --font-interface-theme: 'Sora', system-ui, sans-serif;
+  --font-text-theme:      'Sora', system-ui, sans-serif;
+  --font-monospace-theme: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* gentle global typographic rhythm */
+  --line-height-normal: 1.9;
+  --h1-weight: 700;
+  --h2-weight: 600;
+  --h3-weight: 600;
+  --bold-weight: 600;
+}
+
+/* Readable line length + a little more breathing room in the editor */
+.markdown-source-view,
+.markdown-preview-view {
+  --file-line-width: 640px;
+}
+
+/* ============================================================
+   DARK MODE
+   ============================================================ */
+.theme-dark {
+  /* surfaces */
+  --background-primary:        #0b1018;
+  --background-primary-alt:    #0a0f17;
+  --background-secondary:      #070b12;
+  --background-secondary-alt:  #05080e;
+  --background-modifier-border:        #1b2433;
+  --background-modifier-border-hover:  #283246;
+  --background-modifier-hover:         rgba(255,255,255,0.04);
+  --background-modifier-active-hover:  rgba(56,189,248,0.10);
+
+  /* text */
+  --text-normal:    #c6cfe0;
+  --text-muted:     #66758c;
+  --text-faint:     #46525f;
+  --text-on-accent: #04121d;
+  --text-selection: rgba(56,189,248,0.20);
+
+  /* accent (cyan) — used for active states, buttons, toggles */
+  --interactive-accent:        #38bdf8;
+  --interactive-accent-hover:  #54c8fb;
+  --accent-h: 199; --accent-s: 92%; --accent-l: 60%;
+
+  /* links */
+  --link-color:           #38bdf8;
+  --link-color-hover:     #7dd3fc;
+  --link-unresolved-color:#7a6cae;
+
+  /* headings (violet-tinted for contrast) */
+  --h1-color: #eae8fb;
+  --h2-color: #e3def6;
+  --h3-color: #d6cfee;
+  --h4-color: #c9c1e6;
+  --h5-color: #b9b0d8;
+  --h6-color: #a99fc9;
+  --heading-formatting: #6a6088;
+
+  /* code */
+  --code-background: #0a121e;
+  --code-normal:     #c4b5fd;   /* inline code text (violet) */
+  --code-comment:    #4a5667;
+  --code-keyword:    #c084fc;
+  --code-string:     #34d399;
+  --code-function:   #38bdf8;
+  --code-property:   #7dd3fc;
+  --code-value:      #22d3ee;
+  --code-operator:   #8aa0b8;
+  --code-tag:        #c084fc;
+  --code-punctuation:#8aa0b8;
+
+  /* inline code chip */
+  --text-highlight-bg: rgba(167,139,250,0.22);
+
+  /* tags (violet) */
+  --tag-color:      #b39bff;
+  --tag-background: rgba(167,139,250,0.16);
+
+  /* blockquote (violet bar) */
+  --blockquote-border-color: #3a2f5c;
+  --blockquote-color:        #66758c;
+
+  /* callouts inherit the cyan accent by default */
+  --callout-default: 56, 189, 248;
+  --callout-info:    56, 189, 248;
+  --callout-tip:     56, 189, 248;
+  --callout-success: 52, 211, 153;
+  --callout-warning: 251, 191, 36;
+  --callout-error:   244, 113, 121;
+  --callout-quote:   139, 92, 246;
+
+  /* chrome */
+  --titlebar-background:        #070b12;
+  --titlebar-background-focused:#070b12;
+  --titlebar-text-color:        #66758c;
+  --tab-text-color-focused-active: #eae8fb;
+  --divider-color: #1b2433;
+  --scrollbar-thumb-bg: rgba(120,140,170,0.16);
+  --scrollbar-active-thumb-bg: rgba(56,189,248,0.40);
+
+  /* graph view */
+  --graph-line:  #1b2433;
+  --graph-node:  #66758c;
+  --graph-text:  #c6cfe0;
+  --graph-node-focused: #38bdf8;
+  --graph-node-tag:     #b39bff;
+  --graph-node-attachment: #34d399;
+}
+
+/* ============================================================
+   LIGHT MODE
+   ============================================================ */
+.theme-light {
+  /* surfaces (warm pastel paper) */
+  --background-primary:        #f8f2e7;
+  --background-primary-alt:    #f3ecdb;
+  --background-secondary:      #f1e9d9;
+  --background-secondary-alt:  #ebe1cd;
+  --background-modifier-border:        #e4d8c2;
+  --background-modifier-border-hover:  #d8c9ae;
+  --background-modifier-hover:         rgba(120,90,30,0.05);
+  --background-modifier-active-hover:  rgba(207,154,22,0.12);
+
+  /* text (warm browns) */
+  --text-normal:    #4b4135;
+  --text-muted:     #897c66;
+  --text-faint:     #b4a78f;
+  --text-on-accent: #2e2408;
+  --text-selection: rgba(207,154,22,0.18);
+
+  /* accent (turmeric / mustard) */
+  --interactive-accent:        #cf9a16;
+  --interactive-accent-hover:  #b8860b;
+  --accent-h: 43; --accent-s: 81%; --accent-l: 45%;
+
+  /* links */
+  --link-color:           #a8730a;
+  --link-color-hover:     #8a5e08;
+  --link-unresolved-color:#c2b08a;
+
+  /* headings (deep warm brown) */
+  --h1-color: #392f22;
+  --h2-color: #45382a;
+  --h3-color: #51422f;
+  --h4-color: #5d4d38;
+  --h5-color: #6b5942;
+  --h6-color: #79654c;
+  --heading-formatting: #b4a78f;
+
+  /* code (earthy, warm) */
+  --code-background: #f3ecdb;
+  --code-normal:     #b06022;   /* inline code text (sienna) */
+  --code-comment:    #b4a78f;
+  --code-keyword:    #c2410c;
+  --code-string:     #6f7d2e;
+  --code-function:   #b07d12;
+  --code-property:   #a8730a;
+  --code-value:      #a85a3a;
+  --code-operator:   #897c66;
+  --code-tag:        #c2410c;
+  --code-punctuation:#897c66;
+
+  --text-highlight-bg: rgba(207,154,22,0.20);
+
+  /* tags (warm sienna) */
+  --tag-color:      #b06022;
+  --tag-background: rgba(176,96,34,0.12);
+
+  /* blockquote (soft mustard bar) */
+  --blockquote-border-color: #e0c98f;
+  --blockquote-color:        #897c66;
+
+  /* callouts */
+  --callout-default: 207, 154, 22;
+  --callout-info:    207, 154, 22;
+  --callout-tip:     207, 154, 22;
+  --callout-success: 111, 125, 46;
+  --callout-warning: 217, 119, 6;
+  --callout-error:   180, 60, 40;
+  --callout-quote:   176, 96, 34;
+
+  /* chrome */
+  --titlebar-background:        #f1e9d9;
+  --titlebar-background-focused:#f1e9d9;
+  --titlebar-text-color:        #897c66;
+  --tab-text-color-focused-active: #392f22;
+  --divider-color: #e4d8c2;
+  --scrollbar-thumb-bg: rgba(120,90,40,0.18);
+  --scrollbar-active-thumb-bg: rgba(207,154,22,0.45);
+
+  /* graph view */
+  --graph-line:  #e4d8c2;
+  --graph-node:  #897c66;
+  --graph-text:  #4b4135;
+  --graph-node-focused: #cf9a16;
+  --graph-node-tag:     #b06022;
+  --graph-node-attachment: #6f7d2e;
+}
+
+/* ============================================================
+   Small refinements shared by both modes
+   ============================================================ */
+
+/* Active file in the explorer + active tab get an accent edge */
+.nav-file-title.is-active,
+.workspace-tab-header.is-active {
+  box-shadow: inset 2px 0 0 var(--interactive-accent);
+}
+.workspace-tab-header.is-active {
+  box-shadow: inset 0 2px 0 var(--interactive-accent);
+}
+
+/* Headings: tighten tracking for the geometric/sans feel */
+.markdown-rendered h1,
+.markdown-rendered h2,
+.cm-header { letter-spacing: -0.015em; }
+
+/* Inline code: rounded chip */
+.markdown-rendered code,
+.cm-inline-code {
+  border-radius: 4px;
+  padding: 0.12em 0.4em;
+}
+
+/* Tags: pill shape */
+.tag {
+  border-radius: 11px;
+  padding: 2px 9px;
+  font-family: var(--font-monospace-theme);
+  font-size: 0.82em;
+}
+
+/* Code blocks: softer corners + hairline border */
+.markdown-rendered pre,
+.HyperMD-codeblock-bg {
+  border-radius: 9px;
+}
+.markdown-rendered pre {
+  border: 1px solid var(--background-modifier-border);
+}

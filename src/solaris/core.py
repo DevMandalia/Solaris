@@ -1,6 +1,7 @@
 """Portable Board core — config, paths, frontmatter helpers.
 
-No instance-specific project names. Read Board/config.yml via BOARD_ROOT.
+No instance-specific project names. Read <board_dir>/config.yml via BOARD_ROOT.
+board_dir defaults to the host repo basename on init; legacy `Board/` still works.
 """
 
 from __future__ import annotations
@@ -26,10 +27,13 @@ TODAY = date.today().isoformat()
 @dataclass
 class BoardConfig:
     root: Path
+    board_dir: str
     tasks_dir: Path
     projects_dir: Path
     sprint_file: Path
     wiki_dir: Path | None
+    agents_dir: Path
+    agent_dashboard: Path
     schema_version: int
     projects: list[dict[str, str]]
     folder_aliases: dict[str, str]
@@ -43,8 +47,12 @@ class BoardConfig:
     legacy_filter_tags: frozenset[str] = field(default_factory=frozenset)
 
     @property
+    def board_path(self) -> Path:
+        return self.root / self.board_dir
+
+    @property
     def system_dir(self) -> Path:
-        return self.root / "Board" / "_system"
+        return self.board_path / "_system"
 
     @property
     def triage_enabled(self) -> bool:
@@ -58,6 +66,47 @@ class BoardConfig:
     def initiative_rollup_enabled(self) -> bool:
         return self.features.get("initiative_rollup", False) is True
 
+    @property
+    def agent_registry_enabled(self) -> bool:
+        return self.features.get("agent_registry", False) is True
+
+
+def _looks_like_board_config(path: Path) -> bool:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception:
+        return False
+    return any(
+        marker in text
+        for marker in ("tasks_dir:", "schema_version:", "\nprojects:", "board_dir:")
+    )
+
+
+def find_config_path(root: Path) -> Path | None:
+    """Locate instance config under root (board.config.yml or <board_dir>/config.yml)."""
+    root = root.resolve()
+    alt = root / "board.config.yml"
+    if alt.is_file():
+        return alt
+
+    basename_cfg = root / root.name / "config.yml"
+    if basename_cfg.is_file() and _looks_like_board_config(basename_cfg):
+        return basename_cfg
+
+    legacy = root / "Board" / "config.yml"
+    if legacy.is_file():
+        return legacy
+
+    for child in sorted(root.iterdir(), key=lambda p: p.name.lower()):
+        if not child.is_dir() or child.name.startswith("."):
+            continue
+        if child.name in ("node_modules", ".git", ".venv", "venv", "__pycache__"):
+            continue
+        cand = child / "config.yml"
+        if cand.is_file() and _looks_like_board_config(cand):
+            return cand
+    return None
+
 
 def discover_root(start: Path | None = None) -> Path:
     env = os.environ.get("BOARD_ROOT")
@@ -65,13 +114,31 @@ def discover_root(start: Path | None = None) -> Path:
         return Path(env).expanduser().resolve()
     cur = (start or Path.cwd()).resolve()
     for p in [cur, *cur.parents]:
-        if (p / "Board" / "config.yml").is_file():
-            return p
-        if (p / "board.config.yml").is_file():
+        if find_config_path(p) is not None:
             return p
     raise FileNotFoundError(
-        "Board root not found. Set BOARD_ROOT or run from a tree with Board/config.yml"
+        "Board root not found. Set BOARD_ROOT or run from a tree with "
+        "<board_dir>/config.yml (or Board/config.yml / board.config.yml)"
     )
+
+
+def resolve_board_dir(root: Path, raw: dict[str, Any] | None = None, cfg_path: Path | None = None) -> str:
+    """Resolve board folder name relative to BOARD_ROOT."""
+    if raw and raw.get("board_dir"):
+        return str(raw["board_dir"]).strip().strip("/") or "Board"
+    if cfg_path is not None:
+        cfg_path = cfg_path.resolve()
+        root = root.resolve()
+        if cfg_path.name == "config.yml" and cfg_path.parent != root:
+            return cfg_path.parent.name
+    env_bd = os.environ.get("BOARD_DIR", "").strip()
+    if env_bd:
+        return env_bd
+    if (root / "Board" / "config.yml").is_file():
+        return "Board"
+    if (root / root.name / "config.yml").is_file():
+        return root.name
+    return "Board"
 
 
 def _strip_inline_comment(s: str) -> str:
@@ -180,14 +247,13 @@ def _parse_yaml(text: str) -> dict[str, Any]:
 
 def load_config(root: Path | None = None) -> BoardConfig:
     root = (root or discover_root()).resolve()
-    cfg_path = root / "Board" / "config.yml"
-    if not cfg_path.is_file():
-        alt = root / "board.config.yml"
-        if alt.is_file():
-            cfg_path = alt
-        else:
-            raise FileNotFoundError(f"No config at {cfg_path}")
+    cfg_path = find_config_path(root)
+    if cfg_path is None:
+        raise FileNotFoundError(
+            f"No board config under {root} (expected <board_dir>/config.yml or board.config.yml)"
+        )
     raw = _parse_yaml(cfg_path.read_text(encoding="utf-8"))
+    board_dir = resolve_board_dir(root, raw, cfg_path)
 
     def pjoin(key: str, default: str) -> Path:
         rel = raw.get(key, default)
@@ -211,7 +277,9 @@ def load_config(root: Path | None = None) -> BoardConfig:
     wiki_raw = raw.get("wiki_dir")
     wiki_dir: Path | None
     if wiki_raw in (None, "", "null"):
-        wiki_dir = None
+        # Prefer Wiki/ next to board when present
+        default_wiki = root / "Wiki"
+        wiki_dir = default_wiki if default_wiki.is_dir() else None
     else:
         wp = Path(str(wiki_raw))
         wiki_dir = wp if wp.is_absolute() else root / wp
@@ -219,10 +287,15 @@ def load_config(root: Path | None = None) -> BoardConfig:
     legacy_tags = raw.get("legacy_filter_tags") or []
     return BoardConfig(
         root=root,
-        tasks_dir=pjoin("tasks_dir", "Board/Tasks"),
-        projects_dir=pjoin("projects_dir", "Board/Projects"),
-        sprint_file=pjoin("sprint_file", "Board/Sprint.md"),
+        board_dir=board_dir,
+        tasks_dir=pjoin("tasks_dir", f"{board_dir}/Tasks"),
+        projects_dir=pjoin("projects_dir", "Wiki"),
+        sprint_file=pjoin("sprint_file", f"{board_dir}/Sprints/index.md"),
         wiki_dir=wiki_dir,
+        agents_dir=pjoin("agents_dir", f"{board_dir}/Agents"),
+        agent_dashboard=pjoin(
+            "agent_dashboard", f"{board_dir}/Agents/Agents Dashboard.md"
+        ),
         schema_version=int(raw.get("schema_version") or 2),
         projects=projects,
         folder_aliases=aliases,
@@ -335,10 +408,23 @@ def render_frontmatter(fm: dict[str, str]) -> str:
         "initiative_id",
         "parent_initiative",
         "initiative_path",
+        "agent_id",
+        "plan_id",
         "source",
         "created",
         "updated",
         "due",
+        "model",
+        "owner",
+        "plans_completed",
+        "tasks_completed",
+        "lines_added",
+        "lines_removed",
+        "prs",
+        "tasks_total",
+        "tasks_done",
+        "completed",
+        "wiki_path",
     ]
     lines: list[str] = []
     seen: set[str] = set()
@@ -381,26 +467,15 @@ def active_sprint(cfg: BoardConfig) -> str:
 
 
 def set_active_sprint(cfg: BoardConfig, week: str) -> None:
-    path = cfg.sprint_file
-    if path.is_file():
-        text = path.read_text(encoding="utf-8")
-        if re.search(r"^active_sprint:\s*", text, re.M):
-            text = re.sub(
-                r"^active_sprint:\s*\S+",
-                f"active_sprint: {week}",
-                text,
-                count=1,
-                flags=re.M,
-            )
-        else:
-            text = f"---\nactive_sprint: {week}\n---\n\n" + text
-    else:
-        text = (
-            f"---\nactive_sprint: {week}\n---\n\n"
-            f"# Active sprint\n\nISO week `{week}`.\n"
-        )
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    """Set active_sprint on Sprints/index.md (regenerates index body)."""
+    update_sprints_index(cfg, current_week=week)
+
+
+# Status-style lane names used by Agent work / legacy kanban columns.
+LANE_DISPLAY_ALIASES = {
+    "todo": "doing this week",
+    "in-progress": "in progress now",
+}
 
 
 def normalize_lane(raw: str) -> str:
@@ -409,35 +484,36 @@ def normalize_lane(raw: str) -> str:
         return lane
     if lane in LEGACY_BACKLOG:
         return BACKLOG_LANE
-    if lane == "todo":
-        return "doing this week"
-    if lane == "in-progress":
-        return "in progress now"
+    if lane in LANE_DISPLAY_ALIASES:
+        return LANE_DISPLAY_ALIASES[lane]
     return lane
 
 
 def status_for_lane(lane: str) -> str:
-    if lane == "in progress now":
+    canonical = normalize_lane(lane)
+    if canonical == "in progress now" or lane == "in-progress":
         return "in-progress"
-    if lane == "doing this week":
+    if canonical == "doing this week" or lane == "todo":
         return "todo"
-    if lane == TRIAGE_LANE:
+    if canonical == TRIAGE_LANE:
         return "triage"
-    return lane
+    return canonical
 
 
 def apply_lane(fm: dict[str, str], lane: str, sprint_week: str) -> None:
-    fm["lane"] = yaml_scalar(lane)
-    if lane in (BACKLOG_LANE, ARCHIVED_LANE, TRIAGE_LANE):
+    display = unquote(lane)
+    canonical = normalize_lane(display)
+    written = display if display in LANE_DISPLAY_ALIASES else canonical
+    fm["lane"] = yaml_scalar(written)
+    if canonical in (BACKLOG_LANE, ARCHIVED_LANE, TRIAGE_LANE):
         fm["sprint"] = '""'
-        fm["status"] = f'"{status_for_lane(lane)}"' if lane == TRIAGE_LANE else '""'
-        if lane == TRIAGE_LANE:
+        fm["status"] = f'"{status_for_lane(written)}"' if canonical == TRIAGE_LANE else '""'
+        if canonical == TRIAGE_LANE:
             fm["status"] = '"triage"'
-    elif lane in SPRINT_LANES:
+    elif canonical in SPRINT_LANES:
         fm["sprint"] = f'"{sprint_week}"'
-        fm["status"] = f'"{status_for_lane(lane)}"'
-        # Clear carry when committing to active sprint work
-        if lane in ("doing this week", "in progress now"):
+        fm["status"] = f'"{status_for_lane(written)}"'
+        if canonical in ("doing this week", "in progress now"):
             fm["carry"] = "false"
     fm["updated"] = TODAY
 
@@ -494,6 +570,50 @@ def iter_task_files(cfg: BoardConfig) -> list[Path]:
     )
 
 
+def iter_agent_plan_files(cfg: BoardConfig) -> list[Path]:
+    """Plan ledgers live under Wiki/<Project>/…/Plans/ (not Board/Agents)."""
+    roots: list[Path] = []
+    if cfg.wiki_dir and cfg.wiki_dir.is_dir():
+        roots.append(cfg.wiki_dir)
+    else:
+        # Bare-repo fallback used by plan-open when wiki_dir is unset
+        bare = cfg.root / "Plans"
+        if bare.is_dir():
+            roots.append(bare)
+    # Legacy fallback during migration
+    legacy = cfg.agents_dir / "Plans"
+    if legacy.is_dir():
+        roots.append(legacy)
+    out: list[Path] = []
+    seen: set[Path] = set()
+    for root in roots:
+        for path in root.rglob("*.md"):
+            if "Plans" not in path.parts:
+                continue
+            if path in seen:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            fm, _tags, _body = parse_frontmatter(text)
+            typ = unquote(fm.get("type", ""))
+            if typ in ("agent_plan", "plan") and unquote(fm.get("plan_id", "")):
+                out.append(path)
+                seen.add(path)
+    return sorted(out)
+
+
+def find_agent_plan(cfg: BoardConfig, plan_id: str) -> Path | None:
+    plan_id = plan_id.strip()
+    for path in iter_agent_plan_files(cfg):
+        fm, _t, _b = parse_frontmatter(path.read_text(encoding="utf-8"))
+        if unquote(fm.get("plan_id", "")) == plan_id or path.stem == plan_id:
+            return path
+    return None
+
+
+
 def slugify(title: str, existing: set[str]) -> str:
     base = re.sub(r"[^\w\s-]", "", title.lower(), flags=re.UNICODE)
     base = re.sub(r"\s+", "-", base.strip())[:60].strip("-") or "task"
@@ -519,3 +639,274 @@ def iso_week_delta(a: str, b: str) -> int:
     ya, wa = iso_week_ordinal(a)
     yb, wb = iso_week_ordinal(b)
     return (yb * 53 + wb) - (ya * 53 + wa)
+
+
+def monday_of_iso_week(week: str) -> date:
+    """Monday (ISO day 1) for YYYY-Www."""
+    year, w = iso_week_ordinal(week)
+    return date.fromisocalendar(year, w, 1)
+
+
+def sprint_folder_name(week: str) -> str:
+    """Folder name MM-DD-YYYY for the Monday of the ISO week."""
+    return monday_of_iso_week(week).strftime("%m-%d-%Y")
+
+
+def sprints_dir(cfg: BoardConfig) -> Path:
+    rel = (cfg.rollover or {}).get("sprints_dir") or f"{cfg.board_dir}/Sprints"
+    path = Path(str(rel))
+    return path if path.is_absolute() else cfg.root / path
+
+
+def export_board_markdown(
+    cfg: BoardConfig,
+    *,
+    include_done: bool = True,
+    include_archived: bool = False,
+    week_label: str | None = None,
+    title: str = "Home — week snapshot",
+) -> str:
+    """Markdown kanban snapshot of all tasks (for week archive)."""
+    from collections import defaultdict
+
+    lane_order = [
+        "triage",
+        "backlog",
+        "doing this week",
+        "in progress now",
+        "blocked",
+        "done",
+        "archived",
+    ]
+    by_lane: dict[str, list[str]] = defaultdict(list)
+    for path in iter_task_files(cfg):
+        text = path.read_text(encoding="utf-8")
+        fm, _, _ = parse_frontmatter(text)
+        if unquote(fm.get("type", "")) != "task":
+            continue
+        lane = infer_lane(fm)
+        if lane == "done" and not include_done:
+            continue
+        if lane == "archived" and not include_archived:
+            continue
+        title_t = unquote(fm.get("title", path.stem))
+        project = unquote(fm.get("project", ""))
+        phase = unquote(fm.get("phase", ""))
+        sprint = unquote(fm.get("sprint", ""))
+        extra = f" `{phase}`" if phase else ""
+        sprint_bit = f" · sprint `{sprint}`" if sprint else ""
+        by_lane[lane].append(f"- [{project}] {title_t}{extra}{sprint_bit}")
+
+    week = week_label or active_sprint(cfg)
+    try:
+        mon = monday_of_iso_week(week)
+        sun = date.fromisocalendar(*iso_week_ordinal(week), 7)
+        range_s = f"{mon.isoformat()} → {sun.isoformat()}"
+    except ValueError:
+        range_s = "?"
+
+    lines = [
+        f"# {title}",
+        "",
+        f"- **ISO week:** `{week}`",
+        f"- **Range:** {range_s}",
+        f"- **Archived:** {TODAY}",
+        "",
+    ]
+    for lane in lane_order:
+        if lane not in ALL_LANES:
+            continue
+        if lane == "done" and not include_done:
+            continue
+        if lane == "archived" and not include_archived:
+            continue
+        items = by_lane.get(lane) or []
+        lines.append(f"## {lane} ({len(items)})")
+        lines.append("")
+        if items:
+            lines.extend(items)
+        else:
+            lines.append("_empty_")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def ensure_week_folder(
+    cfg: BoardConfig,
+    week: str,
+    *,
+    write_home_snapshot: bool = False,
+    home_title: str | None = None,
+) -> Path:
+    """Create Board/Sprints/MM-DD-YYYY/ with plan/goals/retro stubs; optional home.md."""
+    folder = sprints_dir(cfg) / sprint_folder_name(week)
+    folder.mkdir(parents=True, exist_ok=True)
+    mon = monday_of_iso_week(week)
+    sun = date.fromisocalendar(*iso_week_ordinal(week), 7)
+    stubs = {
+        "plan.md": f"""---
+type: sprint-doc
+sprint: {week}
+doc: plan
+---
+
+# Weekly planning — {week}
+
+Week of {mon.isoformat()} → {sun.isoformat()}.
+
+## Commitments
+
+-
+
+## Notes
+
+-
+""",
+        "goals.md": f"""---
+type: sprint-doc
+sprint: {week}
+doc: goals
+---
+
+# Weekly goals — {week}
+
+## Goals
+
+-
+
+## Success looks like
+
+-
+""",
+        "retro.md": f"""---
+type: sprint-doc
+sprint: {week}
+doc: retro
+---
+
+# Weekly retrospective — {week}
+
+## Went well
+
+-
+
+## Improve
+
+-
+
+## Carry into next week
+
+-
+""",
+    }
+    for name, body in stubs.items():
+        path = folder / name
+        if not path.is_file():
+            path.write_text(body, encoding="utf-8")
+    if write_home_snapshot:
+        home = folder / "home.md"
+        home.write_text(
+            export_board_markdown(
+                cfg,
+                include_done=True,
+                week_label=week,
+                title=home_title or f"Home — {week}",
+            ),
+            encoding="utf-8",
+        )
+    return folder
+
+
+def patch_home_base_sprint_filter(home_base: Path, week: str) -> bool:
+    """Set Home/Flow Done filter to sprint == \"<week>\". Returns True if patched."""
+    if not home_base.is_file():
+        return False
+    text = home_base.read_text(encoding="utf-8")
+    new_clause = f'sprint == "{week}"'
+    patched, n = re.subn(r'sprint\s*==\s*"\d{4}-W\d{2}"', new_clause, text)
+    if n:
+        home_base.write_text(patched, encoding="utf-8")
+        return True
+    return False
+
+
+def write_sprint_pointer(cfg: BoardConfig, week: str) -> None:
+    """Alias: active sprint lives on Sprints/index.md."""
+    update_sprints_index(cfg, current_week=week)
+
+
+def update_sprints_index(cfg: BoardConfig, *, current_week: str, closed_week: str | None = None) -> None:
+    """Write Board/Sprints/index.md — SoT for active_sprint + week index + ritual."""
+    sdir = sprints_dir(cfg)
+    sdir.mkdir(parents=True, exist_ok=True)
+    # Prefer configured sprint_file when it is the index; else sdir/index.md
+    index = cfg.sprint_file if cfg.sprint_file.name == "index.md" else (sdir / "index.md")
+    weeks: list[str] = []
+    for child in sorted(sdir.iterdir(), reverse=True):
+        if child.is_dir() and (child / "plan.md").is_file():
+            try:
+                fm, _, _ = parse_frontmatter((child / "plan.md").read_text(encoding="utf-8"))
+                w = unquote(fm.get("sprint", ""))
+                if w:
+                    weeks.append(w)
+                    continue
+            except Exception:
+                pass
+            weeks.append(child.name)
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for w in [current_week, closed_week or "", *weeks]:
+        if not w or w in seen:
+            continue
+        seen.add(w)
+        ordered.append(w)
+
+    folder_name = sprint_folder_name(current_week)
+    try:
+        rel = sdir.relative_to(cfg.root).as_posix()
+    except ValueError:
+        rel = str(sdir)
+    bd = cfg.board_dir
+
+    lines = [
+        "---",
+        "type: meta",
+        "title: Weekly sprints",
+        f"active_sprint: {current_week}",
+        "---",
+        "",
+        f"# Weekly sprints — `{current_week}`",
+        "",
+        f"Home (this week’s kanban): [[{bd}/Home.base#Home|Home]] · [[{bd}/Dashboard|Command Center]]",
+        "",
+        f"**This week:** [[{folder_name}/plan|Plan]] · [[{folder_name}/goals|Goals]] · "
+        f"[[{folder_name}/retro|Retro]] · [[{folder_name}/home|Home snapshot]]",
+        "",
+        "## Ritual",
+        "",
+        "- **Sunday night** — week ends (ISO week cutoff).",
+        f"- **Monday 00:05** (launchd) — rollover archives last week to `{rel}/MM-DD-YYYY/`, "
+        "marks unfinished sprint work `carry: true`, starts a new Home board. "
+        "Done cards stay `done` but drop off Home’s Done column (filtered by `sprint`). "
+        "See [[Wiki/Dragonstone Ops/Cron/Board-weekly-home-rollover]].",
+        "",
+        f"Manual: `python3 {bd}/_system/tools/board_sprint_rollover.py --dry-run`",
+        "",
+        "## Weeks",
+        "",
+        "| Week | Monday folder | Docs |",
+        "|------|---------------|------|",
+    ]
+    for w in ordered:
+        try:
+            folder = sprint_folder_name(w)
+            label = w
+        except ValueError:
+            folder = w
+            label = w
+        lines.append(
+            f"| `{label}` | [[{folder}/home|{folder}]] | "
+            f"[[{folder}/plan|plan]] · [[{folder}/goals|goals]] · [[{folder}/retro|retro]] |"
+        )
+    index.parent.mkdir(parents=True, exist_ok=True)
+    index.write_text("\n".join(lines) + "\n", encoding="utf-8")

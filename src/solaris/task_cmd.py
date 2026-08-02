@@ -17,14 +17,17 @@ from pathlib import Path
 from solaris.core import (  # noqa: E402
     ALL_LANES,
     BACKLOG_LANE,
+    LANE_DISPLAY_ALIASES,
     TRIAGE_LANE,
     TODAY,
     active_sprint,
     apply_lane,
+    find_agent_plan,
     folder_for_project,
     infer_lane,
     iter_task_files,
     load_config,
+    normalize_lane,
     parse_frontmatter,
     render_frontmatter,
     slugify,
@@ -70,9 +73,28 @@ def cmd_create(args: argparse.Namespace) -> int:
     if source == "roadmap-sync" and lane == TRIAGE_LANE:
         lane = BACKLOG_LANE
     if source == "agent" and lane == TRIAGE_LANE:
-        lane = args.lane if args.lane != TRIAGE_LANE else "doing this week"
-        if args.lane == TRIAGE_LANE:
-            lane = "doing this week"
+        lane = "todo"
+    if source == "agent":
+        if lane == "doing this week":
+            lane = "todo"
+        elif lane == "in progress now":
+            lane = "in-progress"
+
+    agent_id = (getattr(args, "agent", None) or "").strip()
+    plan_id = (getattr(args, "plan_id", None) or "").strip()
+    if source == "agent" and cfg.agent_registry_enabled:
+        if not agent_id:
+            raise SystemExit(
+                "source=agent requires --agent <agent_id> when features.agent_registry is on."
+            )
+        agent_path = cfg.agents_dir / f"{agent_id}.md"
+        if not agent_path.is_file():
+            raise SystemExit(f"Agent not registered: {agent_id}")
+        if not plan_id:
+            raise SystemExit("source=agent requires --plan-id when features.agent_registry is on.")
+        plan_path = find_agent_plan(cfg, plan_id)
+        if not plan_path or not plan_path.is_file():
+            raise SystemExit(f"Plan not found: {plan_id}")
 
     folder = folder_for_project(cfg, project)
     dest_dir = cfg.tasks_dir / folder
@@ -109,6 +131,10 @@ def cmd_create(args: argparse.Namespace) -> int:
         fm["initiative_id"] = args.initiative_id
     if args.roadmap_id:
         fm["roadmap_id"] = args.roadmap_id
+    if agent_id:
+        fm["agent_id"] = agent_id
+    if plan_id:
+        fm["plan_id"] = plan_id
 
     apply_lane(fm, lane, week)
     fm["_tags_list"] = [tag, source] if source not in (tag,) else [tag]
@@ -165,24 +191,37 @@ def cmd_move(args: argparse.Namespace) -> int:
     cfg = load_config()
     path = _resolve_task(cfg, args.task)
     lane = args.lane
-    if lane not in ALL_LANES:
-        raise SystemExit(f"Invalid lane {lane!r}. Choose from: {sorted(ALL_LANES)}")
+    canonical = normalize_lane(lane)
+    if canonical not in ALL_LANES:
+        raise SystemExit(
+            f"Invalid lane {lane!r}. Choose from: {sorted(ALL_LANES)} "
+            f"(aliases: {sorted(LANE_DISPLAY_ALIASES)})"
+        )
 
     text = path.read_text(encoding="utf-8")
     fm, tags, body = parse_frontmatter(text)
     source = unquote(fm.get("source", ""))
-    if source == "roadmap-sync" and lane == TRIAGE_LANE:
+    if source == "roadmap-sync" and canonical == TRIAGE_LANE:
         print("roadmap-sync tasks cannot move to triage", file=sys.stderr)
         return 1
-    if source == "agent" and lane == TRIAGE_LANE:
+    if source == "agent" and canonical == TRIAGE_LANE:
         print("agent execution tasks skip triage", file=sys.stderr)
         return 1
+    if source == "agent":
+        if canonical == "doing this week":
+            lane = "todo"
+        elif canonical == "in progress now":
+            lane = "in-progress"
+        else:
+            lane = canonical
+    else:
+        lane = canonical
 
     week = active_sprint(cfg)
     apply_lane(fm, lane, week)
     if args.blocked_reason:
         fm["blocked_reason"] = yaml_scalar(args.blocked_reason)
-    elif lane != "blocked":
+    elif canonical != "blocked":
         fm["blocked_reason"] = '""'
     fm["_tags_list"] = tags
     path.write_text(f"---\n{render_frontmatter(fm)}\n---{body}", encoding="utf-8")
@@ -290,6 +329,8 @@ def main() -> int:
     c.add_argument("--slug", default="")
     c.add_argument("--order", type=int, default=None)
     c.add_argument("--build", action="store_true", help="Use build-task body sections")
+    c.add_argument("--agent", default="", help="Registered agent_id (required for source=agent when registry on)")
+    c.add_argument("--plan-id", default="", dest="plan_id", help="Open plan_id from agent plan-open")
     c.add_argument("--force", action="store_true")
     c.set_defaults(func=cmd_create)
 
@@ -305,6 +346,8 @@ def main() -> int:
     e.add_argument("--priority")
     e.add_argument("--phase")
     e.add_argument("--initiative-id")
+    e.add_argument("--agent", default=None)
+    e.add_argument("--plan-id", dest="plan_id", default=None)
     e.add_argument("--append-log")
     e.add_argument("--plan")
     e.add_argument("--final-summary")
@@ -315,6 +358,8 @@ def main() -> int:
     l.add_argument("--phase")
     l.add_argument("--project")
     l.add_argument("--source")
+    l.add_argument("--agent")
+    l.add_argument("--plan-id", dest="plan_id")
     l.set_defaults(func=cmd_list)
 
     args = ap.parse_args()
