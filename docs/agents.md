@@ -12,8 +12,10 @@ stability: changes when core board model changes
 Portable markdown project board for humans and AI agents.  
 **Instance overlay** (projects, capture, cron): read `Board/INSTANCE.md` after this file.
 
-Tools: `Board/_system/tools/` · Config: `Board/config.yml` · Set `BOARD_ROOT` if not auto-discovered.  
+Tools: `Board/_system/tools/` · Config: `Board/config.yml` · Set `BOARD_ROOT` if not auto-discovered (or use tag-along `solaris.toml` in a linked code repo).  
 Safety rails: [[Board/_system/SAFETY]] (gap guard, source→lane rules, rollup write scope, feature flags).
+
+**Planes:** this board/wiki is the **work + project record** (plans, PRDs, tickets, performance). It is **not** a memory layer — lessons/skills go to Team-Memory. See fleet protocol when present (e.g. Dragonstone Team-Memory).
 
 ---
 
@@ -23,11 +25,31 @@ Safety rails: [[Board/_system/SAFETY]] (gap guard, source→lane rules, rollup w
 2. **Lanes:** `triage` → `backlog` → `doing this week` → `in progress now` → `blocked` → `done` / `archived`.
 3. **`done` = shipped.** **`archived` = withdrawn** (not shipped).
 4. **Register before code** — persistent profile in `Board/Agents/<agent_id>.md` (see Agents Dashboard).
-5. **Plan before implement** — open a plan ledger + wiki plan; file tasks with `agent_id` + `plan_id`.
+5. **Plan before implement** — open a plan ledger + wiki plan; file tasks with `agent_id` + `plan_id`. Cursor **hard-gates** linked-repo code until gate-ready. PRDs are soft (initiative / large scope).
 6. **Mutate tasks via CLI** — `board_task.py` create/move/edit — do not hand-edit YAML frontmatter.
 7. **Agent execution is automatic** after the user accepts a plan: create tickets, move lanes, no per-ticket human gate.
 8. **`source: agent`** tickets never use `triage`. **`source: roadmap-sync`** never uses `triage`.
-9. **Close the plan** with self-reported `--lines-added` / `--lines-removed` / `--prs`.
+9. **Close the plan** with self-reported `--lines-added` / `--lines-removed` / `--prs`; distill lessons to Team-Memory (not ticket bodies).
+
+---
+
+## Tag-along gate (linked code repos)
+
+When the board vault is separate from the code repo (`solaris.toml` → `board_root`):
+
+1. `solaris doctor` from the code repo — must resolve the vault and list `linked_repos`.
+2. Cursor hard-gates **code** edits until register + `plan-open` + session-bind + ≥1 task.
+3. PRDs are **soft** (`require_prd: false` by default) — use for initiatives / large scope.
+4. Hook resilience: import/runtime failures **fail open** (allow + warning) so agents are not deadlocked; intentional denies still block. Linked repos vendor `.cursor/lib/` via `solaris init --link`.
+5. Soft skill for non-Cursor agents: Hermes `solaris-board-loop`.
+
+Session start checklist (linked repo):
+
+```bash
+solaris doctor
+solaris agent list --plans --open
+solaris agent gate-status
+```
 
 ---
 

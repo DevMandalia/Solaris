@@ -163,3 +163,71 @@ def test_clear_session_unbinds(vault: GatePaths):
     bind_session(vault, agent_id="cursor-dragonstone", plan_id="p1")
     clear_session(vault)
     assert load_session(vault) == {}
+
+
+def test_tagalong_blocks_code_until_ready(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("BOARD_ROOT", raising=False)
+    vault = tmp_path / "Vault"
+    app = tmp_path / "App"
+    (vault / "Board" / "Agents").mkdir(parents=True)
+    (vault / "Board" / "Tasks" / "Eng").mkdir(parents=True)
+    (vault / "Wiki" / "Eng" / "Plans").mkdir(parents=True)
+    (vault / ".cursor").mkdir(parents=True)
+    (app / ".cursor").mkdir(parents=True)
+    (vault / "Board" / "config.yml").write_text(
+        """
+board_dir: Board
+tasks_dir: Board/Tasks
+wiki_dir: Wiki
+agents_dir: Board/Agents
+agent_dashboard: Board/Agents/Agents Dashboard.md
+schema_version: 2
+projects:
+  - folder: Eng
+    name: Eng
+    filter_tag: Eng
+    domain: eng
+features:
+  agent_registry: true
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    (vault / "Board" / "Sprints").mkdir(parents=True, exist_ok=True)
+    (vault / "Board" / "Sprints" / "index.md").write_text(
+        "---\nactive_sprint: 2026-W31\n---\n",
+        encoding="utf-8",
+    )
+    (app / "solaris.toml").write_text(
+        f'board_root = "{vault}"\nrepo_id = "app"\n',
+        encoding="utf-8",
+    )
+    paths = GatePaths.from_root(app)
+    assert paths.workspace == app.resolve()
+    assert paths.board_root == vault.resolve()
+    assert paths.state.parent == app.resolve() / ".cursor"
+
+    code_file = app / "src" / "main.py"
+    code_file.parent.mkdir(parents=True)
+    d = decide_mutation(paths, tool_name="Write", file_paths=[str(code_file)])
+    assert d["permission"] == "deny"
+
+    d2 = decide_mutation(
+        paths,
+        tool_name="Write",
+        file_paths=[str(vault / "Board" / "Agents" / "cursor-dragonstone.md")],
+    )
+    assert d2["permission"] == "allow"
+
+    _register(paths)
+    _open_plan(paths)
+    _task(paths)
+    mark_rules_read(paths, "cursor-dragonstone", ["Board/_system/AGENT-CONTEXT.md"])
+    assert compute_status(paths).ready
+    d3 = decide_mutation(paths, tool_name="Write", file_paths=[str(code_file)])
+    assert d3["permission"] == "allow"
+
+
+def test_require_prd_default_off(vault: GatePaths):
+    gcfg = load_gate_config(vault)
+    assert gcfg.require_prd is False

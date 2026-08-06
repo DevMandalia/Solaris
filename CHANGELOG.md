@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.6] — 2026-08-05
+
+### Added
+
+- **Tag-along binding** — `solaris.toml` / `.solaris/config.toml` + vault `linked_repos`; `resolve_board_root()`; `solaris doctor`
+- **`solaris init --link`** — install Cursor gate into a code repo; vendors `.cursor/lib/` so system Python need not `pip install solaris`
+- Agent gate **v2.1** — workspace ≠ `board_root`; per-repo session under code `.cursor/`; soft `require_prd` (default false)
+- Resilient Cursor hook — import/runtime failures **fail open** (never deadlock the agent); intentional denies still block
+
+### Changed
+
+- Docs: planes (Solaris = work/record, not memory); tag-along gate section in `docs/agents.md` / `AGENT-CONTEXT.md`
+
 ## [0.1.5] — 2026-08-01
 
 ### Added

@@ -193,7 +193,7 @@ def cmd_plan_open(args: argparse.Namespace) -> int:
 
     print(wiki_path)
     try:
-        paths = GatePaths.from_root(cfg.root)
+        paths = _gate_paths(cfg)
         bind_session(paths, agent_id=agent_id, plan_id=plan_id, plan_path=wiki_path)
         print(f"session bound -> {plan_id}", file=sys.stderr)
     except Exception as exc:
@@ -297,7 +297,7 @@ def cmd_plan_close(args: argparse.Namespace) -> int:
     _write_md(agent_path, afm, abody)
 
     try:
-        paths = GatePaths.from_root(cfg.root)
+        paths = _gate_paths(cfg)
         sess = load_session(paths)
         if not sess.get("plan_id") or sess.get("plan_id") == plan_id:
             clear_session(paths)
@@ -511,6 +511,15 @@ def _regenerate_dashboard(cfg) -> Path:
     return path
 
 
+def _gate_paths(cfg) -> GatePaths:
+    """Workspace = cwd (code repo or vault); board_root from cfg / solaris.toml."""
+    import os
+    from pathlib import Path
+
+    os.environ.setdefault("BOARD_ROOT", str(cfg.root))
+    return GatePaths.from_root(Path.cwd())
+
+
 def cmd_dashboard(_args: argparse.Namespace) -> int:
     cfg = load_config()
     path = _regenerate_dashboard(cfg)
@@ -520,16 +529,19 @@ def cmd_dashboard(_args: argparse.Namespace) -> int:
 
 def cmd_gate_status(_args: argparse.Namespace) -> int:
     cfg = load_config()
-    paths = GatePaths.from_root(cfg.root)
+    paths = _gate_paths(cfg)
     gcfg = load_gate_config(paths)
     status = compute_status(paths, gcfg)
     print(f"agent_id:      {status.agent_id}")
+    print(f"board_root:    {status.board_root or paths.board_root}")
+    print(f"workspace:     {status.workspace or paths.workspace}")
     print(f"rules_read:    {status.rules_read}")
     print(f"registered:    {status.registered}")
     print(f"open_plans:    {', '.join(p['plan_id'] for p in status.open_plans) or '(none)'}")
     print(f"session_plan:  {status.session_plan_id or '(none)'}")
     print(f"session_bound: {status.session_bound}")
     print(f"tasks:         {status.task_count}")
+    print(f"require_prd:   {gcfg.require_prd}")
     print(f"dry_run:       {status.dry_run}")
     print(f"ready:         {status.ready}")
     if not status.ready:
@@ -541,7 +553,7 @@ def cmd_gate_status(_args: argparse.Namespace) -> int:
 
 def cmd_session_bind(args: argparse.Namespace) -> int:
     cfg = load_config()
-    paths = GatePaths.from_root(cfg.root)
+    paths = _gate_paths(cfg)
     gcfg = load_gate_config(paths)
     agent_id = args.agent or gcfg.agent_id
     plan_id = args.plan_id.strip()
@@ -563,7 +575,7 @@ def cmd_session_bind(args: argparse.Namespace) -> int:
 
 def cmd_session_unbind(_args: argparse.Namespace) -> int:
     cfg = load_config()
-    paths = GatePaths.from_root(cfg.root)
+    paths = _gate_paths(cfg)
     clear_session(paths)
     print("session unbound")
     return 0

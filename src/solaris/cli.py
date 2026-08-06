@@ -105,6 +105,11 @@ def main(argv: list[str] | None = None) -> int:
         finally:
             sys.argv = old
 
+    if cmd == "doctor":
+        from solaris.doctor import main as doctor_main
+
+        return doctor_main(rest)
+
     print(f"Unknown command: {cmd}", file=sys.stderr)
     _print_help()
     return 2
@@ -120,6 +125,7 @@ Usage:
 
 Commands:
   init       Scaffold <board_dir>/ (default: repo basename) + Wiki/Notes/Welcome
+  doctor     Verify board_root binding (tag-along solaris.toml / BOARD_ROOT)
   task       create | move | edit | list
   agent      register | plan-open | plan-close | session-bind | gate-status | dashboard | list
   export     Markdown kanban snapshot
@@ -129,7 +135,9 @@ Commands:
 
 Examples:
   solaris init --name MyApp --project Eng
+  solaris init --link --root /path/to/code-repo   # install Cursor gate into linked repo
   export BOARD_ROOT=$PWD
+  solaris doctor
   solaris agent register --id my-bot --name "My Bot" --model gpt --owner You
   solaris agent plan-open --agent my-bot --title "Ship CLI" --project Eng
   solaris task create --title "Ship CLI" --project Eng --build --agent my-bot --plan-id <id>

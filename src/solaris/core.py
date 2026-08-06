@@ -25,6 +25,24 @@ TODAY = date.today().isoformat()
 
 
 @dataclass
+class LinkedRepo:
+    """Code repo linked to this vault (tag-along)."""
+
+    id: str
+    path: Path
+    remote: str = ""
+
+
+@dataclass
+class SolarisPointer:
+    """Pointer file in a code repo (`solaris.toml` or `.solaris/config.toml`)."""
+
+    path: Path
+    board_root: Path
+    repo_id: str = ""
+
+
+@dataclass
 class BoardConfig:
     root: Path
     board_dir: str
@@ -45,6 +63,7 @@ class BoardConfig:
     project_filter_tag: dict[str, str] = field(default_factory=dict)
     project_domain: dict[str, str] = field(default_factory=dict)
     legacy_filter_tags: frozenset[str] = field(default_factory=frozenset)
+    linked_repos: list[LinkedRepo] = field(default_factory=list)
 
     @property
     def board_path(self) -> Path:
@@ -108,18 +127,120 @@ def find_config_path(root: Path) -> Path | None:
     return None
 
 
-def discover_root(start: Path | None = None) -> Path:
+def _parse_simple_toml(text: str) -> dict[str, str]:
+    """Minimal TOML: top-level string/bool keys only (no tables). No extra deps."""
+    out: dict[str, str] = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("["):
+            break
+        if "=" not in line:
+            continue
+        key, _, rest = line.partition("=")
+        key = key.strip()
+        rest = rest.strip()
+        if rest.startswith('"') and rest.endswith('"'):
+            val = rest[1:-1].replace('\\"', '"').replace("\\\\", "\\")
+        elif rest.startswith("'") and rest.endswith("'"):
+            val = rest[1:-1]
+        else:
+            val = rest.split("#", 1)[0].strip()
+        out[key] = val
+    return out
+
+
+def find_solaris_pointer(start: Path | None = None) -> Path | None:
+    """Walk up from start for solaris.toml or .solaris/config.toml."""
+    cur = (start or Path.cwd()).resolve()
+    for p in [cur, *cur.parents]:
+        for cand in (p / "solaris.toml", p / ".solaris" / "config.toml"):
+            if cand.is_file():
+                return cand
+    return None
+
+
+def load_solaris_pointer(path: Path) -> SolarisPointer:
+    raw = _parse_simple_toml(path.read_text(encoding="utf-8"))
+    br = raw.get("board_root", "").strip()
+    if not br:
+        raise ValueError(f"{path}: missing board_root")
+    board_root = Path(br).expanduser()
+    if not board_root.is_absolute():
+        board_root = (path.parent / board_root).resolve()
+    else:
+        board_root = board_root.resolve()
+    return SolarisPointer(
+        path=path.resolve(),
+        board_root=board_root,
+        repo_id=str(raw.get("repo_id", "") or "").strip(),
+    )
+
+
+def resolve_board_root(start: Path | None = None) -> Path:
+    """Resolve vault/board root: BOARD_ROOT → solaris.toml walk-up → local board config.
+
+    Fail closed with a clear error if nothing resolves.
+    """
     env = os.environ.get("BOARD_ROOT")
     if env:
         return Path(env).expanduser().resolve()
-    cur = (start or Path.cwd()).resolve()
-    for p in [cur, *cur.parents]:
+
+    start = (start or Path.cwd()).resolve()
+    ptr = find_solaris_pointer(start)
+    if ptr is not None:
+        try:
+            pointer = load_solaris_pointer(ptr)
+        except ValueError as e:
+            raise FileNotFoundError(str(e)) from e
+        if find_config_path(pointer.board_root) is None:
+            raise FileNotFoundError(
+                f"solaris.toml board_root={pointer.board_root} has no board config "
+                f"(expected <board_dir>/config.yml). Fix {ptr}"
+            )
+        return pointer.board_root
+
+    for p in [start, *start.parents]:
         if find_config_path(p) is not None:
             return p
+
     raise FileNotFoundError(
-        "Board root not found. Set BOARD_ROOT or run from a tree with "
-        "<board_dir>/config.yml (or Board/config.yml / board.config.yml)"
+        "Board root not found. Set BOARD_ROOT, add solaris.toml with board_root=…, "
+        "or run from a tree with <board_dir>/config.yml"
     )
+
+
+def discover_root(start: Path | None = None) -> Path:
+    """Alias for resolve_board_root (backward compatible)."""
+    return resolve_board_root(start)
+
+
+def parse_linked_repos(raw: dict[str, Any], vault_root: Path) -> list[LinkedRepo]:
+    items = raw.get("linked_repos") or []
+    if not isinstance(items, list):
+        return []
+    out: list[LinkedRepo] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        rid = str(item.get("id") or "").strip()
+        path_raw = str(item.get("path") or "").strip()
+        if not rid or not path_raw:
+            continue
+        p = Path(path_raw).expanduser()
+        if not p.is_absolute():
+            p = (vault_root / p).resolve()
+        else:
+            p = p.resolve()
+        out.append(
+            LinkedRepo(
+                id=rid,
+                path=p,
+                remote=str(item.get("remote") or "").strip(),
+            )
+        )
+    return out
 
 
 def resolve_board_dir(root: Path, raw: dict[str, Any] | None = None, cfg_path: Path | None = None) -> str:
@@ -307,6 +428,7 @@ def load_config(root: Path | None = None) -> BoardConfig:
         project_filter_tag=project_filter_tag,
         project_domain=project_domain,
         legacy_filter_tags=frozenset(str(t) for t in legacy_tags),
+        linked_repos=parse_linked_repos(raw, root),
     )
 
 

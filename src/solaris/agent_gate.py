@@ -3,6 +3,8 @@
 v1: block until rules read + registered + open plan + ≥1 task
 v1.5: bind session to a specific plan_id
 v2: dry-run, path noise allowlist, testable API
+v2.1: tag-along — workspace (code repo) may differ from board_root (vault);
+      per-repo session/state under workspace/.cursor/; plans/tasks on board_root
 """
 
 from __future__ import annotations
@@ -17,7 +19,6 @@ from typing import Any
 
 DEFAULT_AGENT_ID = "cursor-dragonstone"
 
-# Legacy fixed suffixes; prefer rules_path_suffixes(board_dir) at runtime.
 RULES_PATH_SUFFIXES = (
     "Board/_system/AGENT-CONTEXT.md",
     "Board/Agents/AGENT-CONTEXT.md",
@@ -61,6 +62,7 @@ def resolve_board_dir_for_root(root: Path) -> str:
             return name
     return "Board"
 
+
 MUTATING_TOOLS = frozenset(
     {
         "Write",
@@ -72,7 +74,6 @@ MUTATING_TOOLS = frozenset(
     }
 )
 
-# Obsidian / editor churn — never block (agents rarely own these, but tools may touch them)
 NOISE_PATH_PREFIXES = (
     ".obsidian/workspace.json",
     ".obsidian/workspace-mobile.json",
@@ -82,9 +83,7 @@ NOISE_PATH_PREFIXES = (
     ".trash/",
 )
 
-NOISE_PATH_SUFFIXES = (
-    ".DS_Store",
-)
+NOISE_PATH_SUFFIXES = (".DS_Store",)
 
 
 def _now() -> str:
@@ -97,16 +96,45 @@ def _norm(path: str | Path) -> str:
 
 @dataclass
 class GatePaths:
-    root: Path
+    """Gate paths for a workspace; board_root may be a separate tag-along vault."""
+
+    workspace: Path
+    board_root: Path
     state: Path
     session: Path
     config: Path
 
+    @property
+    def root(self) -> Path:
+        """Board/vault root (plans, tasks, agent profiles)."""
+        return self.board_root
+
     @classmethod
     def from_root(cls, root: Path) -> "GatePaths":
-        cursor = root / ".cursor"
+        """Resolve board_root from root (env / solaris.toml / local board).
+
+        Session + gate state live under the *workspace* (.cursor/), so two
+        linked repos do not clobber each other's session binds.
+        """
+        workspace = root.resolve()
+        board_root = workspace
+        try:
+            from solaris.core import find_config_path, resolve_board_root
+
+            try:
+                board_root = resolve_board_root(workspace)
+            except FileNotFoundError:
+                if find_config_path(workspace) is not None:
+                    board_root = workspace
+                else:
+                    board_root = workspace
+        except ImportError:
+            board_root = workspace
+
+        cursor = workspace / ".cursor"
         return cls(
-            root=root.resolve(),
+            workspace=workspace,
+            board_root=board_root.resolve(),
             state=cursor / "agent-gate-state.json",
             session=cursor / "agent-session.json",
             config=cursor / "agent-gate-config.json",
@@ -117,10 +145,9 @@ class GatePaths:
 class GateConfig:
     agent_id: str = DEFAULT_AGENT_ID
     dry_run: bool = False
-    # When True, require session.plan_id to match an open plan (v1.5)
     require_session_bind: bool = True
-    # Auto-bind when exactly one open plan exists for the agent
     auto_bind_single_plan: bool = True
+    require_prd: bool = False
 
 
 @dataclass
@@ -137,6 +164,8 @@ class GateStatus:
     session_plan_id: str | None = None
     session_bound: bool = False
     dry_run: bool = False
+    board_root: str | None = None
+    workspace: str | None = None
 
 
 def load_gate_config(paths: GatePaths, agent_id: str | None = None) -> GateConfig:
@@ -156,6 +185,8 @@ def load_gate_config(paths: GatePaths, agent_id: str | None = None) -> GateConfi
                 cfg.require_session_bind = bool(raw["require_session_bind"])
             if "auto_bind_single_plan" in raw:
                 cfg.auto_bind_single_plan = bool(raw["auto_bind_single_plan"])
+            if "require_prd" in raw:
+                cfg.require_prd = bool(raw["require_prd"])
             if raw.get("agent_id"):
                 cfg.agent_id = str(raw["agent_id"])
     return cfg
@@ -204,6 +235,7 @@ def bind_session(
         "plan_id": plan_id,
         "plan_path": plan_path,
         "bound_at": _now(),
+        "board_root": str(paths.board_root),
     }
     _write_json(paths.session, session)
     return session
@@ -228,7 +260,6 @@ def mark_rules_read(paths: GatePaths, agent_id: str, rule_paths: list[str] | Non
 def is_rules_path(path: str, board_dir: str | None = None) -> bool:
     n = _norm(path)
     suffixes = rules_path_suffixes(board_dir) if board_dir else RULES_PATH_SUFFIXES
-    # Also accept any board_dir variant from common markers
     markers = (
         "/_system/AGENT-CONTEXT.md",
         "/Agents/AGENT-CONTEXT.md",
@@ -244,25 +275,47 @@ def is_rules_path(path: str, board_dir: str | None = None) -> bool:
     return any(n.endswith(s) or s in n for s in suffixes)
 
 
-def rel_to_root(paths: GatePaths, path: str | Path) -> str | None:
+def _rel_to(base: Path, path: str | Path) -> str | None:
     try:
         p = Path(path).expanduser().resolve()
-        return _norm(p.relative_to(paths.root))
+        return _norm(p.relative_to(base.resolve()))
     except Exception:
         return None
 
 
+def rel_to_root(paths: GatePaths, path: str | Path) -> str | None:
+    return _rel_to(paths.board_root, path)
+
+
+def rel_to_workspace(paths: GatePaths, path: str | Path) -> str | None:
+    return _rel_to(paths.workspace, path)
+
+
 def is_noise_path(paths: GatePaths, path: str) -> bool:
-    rel = rel_to_root(paths, path)
     n = _norm(path)
     if any(n.endswith(suf) or n.endswith("/" + suf) for suf in NOISE_PATH_SUFFIXES):
         return True
-    if rel is None:
-        return False
-    return any(rel == pref or rel.startswith(pref) for pref in NOISE_PATH_PREFIXES)
+    for base in (paths.board_root, paths.workspace):
+        rel = _rel_to(base, path)
+        if rel and any(rel == pref or rel.startswith(pref) for pref in NOISE_PATH_PREFIXES):
+            return True
+    return False
 
 
 def is_bootstrap_write_path(paths: GatePaths, path: str) -> bool:
+    ws_rel = rel_to_workspace(paths, path)
+    if ws_rel in (
+        ".cursor/agent-gate-state.json",
+        ".cursor/agent-session.json",
+        ".cursor/agent-gate-config.json",
+        ".cursor/hooks.json",
+        "solaris.toml",
+        ".solaris/config.toml",
+    ):
+        return True
+    if ws_rel and ws_rel.startswith(".cursor/hooks/") and ws_rel.endswith(".py"):
+        return True
+
     rel = rel_to_root(paths, path)
     if rel is None:
         return False
@@ -275,7 +328,7 @@ def is_bootstrap_write_path(paths: GatePaths, path: str) -> bool:
         return True
     if rel.startswith(".cursor/hooks/") and rel.endswith(".py"):
         return True
-    bd = resolve_board_dir_for_root(paths.root)
+    bd = resolve_board_dir_for_root(paths.board_root)
     if rel.startswith(f"{bd}/Agents/") and rel.endswith(".md"):
         return True
     if "/Plans/" in rel and rel.endswith(".md"):
@@ -288,12 +341,13 @@ def is_bootstrap_write_path(paths: GatePaths, path: str) -> bool:
         f"{bd}/Agents Dashboard.md",
     ):
         return True
-    # Legacy Board/ bootstrap during migration
     if rel.startswith("Board/Agents/") and rel.endswith(".md"):
         return True
     if rel.startswith("Board/Tasks/") and rel.endswith(".md"):
         return True
     if rel == "Board/Agents Dashboard.md":
+        return True
+    if rel.startswith("Wiki/") and rel.endswith(".md"):
         return True
     return False
 
@@ -337,11 +391,11 @@ def _board_imports(root: Path):
 
 def compute_status(paths: GatePaths, gcfg: GateConfig | None = None) -> GateStatus:
     gcfg = gcfg or load_gate_config(paths)
-    os.environ.setdefault("BOARD_ROOT", str(paths.root))
+    os.environ.setdefault("BOARD_ROOT", str(paths.board_root))
     iter_agent_plan_files, iter_task_files, load_config, parse_frontmatter, unquote = _board_imports(
-        paths.root
+        paths.board_root
     )
-    cfg = load_config(paths.root)
+    cfg = load_config(paths.board_root)
     state = load_state(paths)
     session = load_session(paths)
     rules_read = bool(state.get("rules_read_at"))
@@ -382,7 +436,6 @@ def compute_status(paths: GatePaths, gcfg: GateConfig | None = None) -> GateStat
         session_plan_id = only["plan_id"]
         session = load_session(paths)
 
-    # If bound plan is no longer open, clear bind
     open_ids = {p["plan_id"] for p in open_plans}
     if session_plan_id and session_plan_id not in open_ids:
         clear_session(paths)
@@ -409,7 +462,7 @@ def compute_status(paths: GatePaths, gcfg: GateConfig | None = None) -> GateStat
 
     session_bound = bool(session_plan_id) and session_plan_id in open_ids
     missing: list[str] = []
-    bd = getattr(cfg, "board_dir", None) or resolve_board_dir_for_root(paths.root)
+    bd = getattr(cfg, "board_dir", None) or resolve_board_dir_for_root(paths.board_root)
     if not rules_read:
         missing.append(
             f"Read {bd}/_system/AGENT-CONTEXT.md (or .cursor/rules/agent-board-loop.mdc)"
@@ -420,17 +473,19 @@ def compute_status(paths: GatePaths, gcfg: GateConfig | None = None) -> GateStat
         )
     if not open_plans:
         missing.append(
-            f"Open a plan: board_agent.py plan-open --agent {gcfg.agent_id} --title ... --project ..."
+            f"Open a plan: solaris agent plan-open --agent {gcfg.agent_id} --title ... --project ..."
         )
     if gcfg.require_session_bind and open_plans and not session_bound:
         missing.append(
-            "Bind session to a plan: board_agent.py session-bind --plan-id <id> "
+            "Bind session to a plan: solaris agent session-bind --plan-id <id> "
             "(auto if exactly one open plan)"
         )
     if task_count < 1:
         missing.append(
-            f"Create todos: board_task.py create --agent {gcfg.agent_id} --plan-id <id> ..."
+            f"Create todos: solaris task create --agent {gcfg.agent_id} --plan-id <id> ..."
         )
+    if gcfg.require_prd:
+        missing.append("PRD required (require_prd=true) — open a Wiki PRD for this initiative")
 
     ready = (
         rules_read
@@ -438,6 +493,7 @@ def compute_status(paths: GatePaths, gcfg: GateConfig | None = None) -> GateStat
         and bool(open_plans)
         and task_count >= 1
         and (session_bound or not gcfg.require_session_bind)
+        and (not gcfg.require_prd)
     )
 
     return GateStatus(
@@ -453,6 +509,8 @@ def compute_status(paths: GatePaths, gcfg: GateConfig | None = None) -> GateStat
         session_plan_id=session_plan_id,
         session_bound=session_bound,
         dry_run=gcfg.dry_run,
+        board_root=str(paths.board_root),
+        workspace=str(paths.workspace),
     )
 
 
@@ -463,10 +521,15 @@ def blocking_message(status: GateStatus) -> str:
     ]
     for m in status.missing:
         lines.append(f"  - {m}")
+    if status.board_root:
+        lines.append(f"Board root: {status.board_root}")
+    if status.workspace and status.workspace != status.board_root:
+        lines.append(f"Workspace: {status.workspace}")
     lines.extend(
         [
             "",
             "Session start:",
+            "  0) solaris doctor  (verify tag-along binding)",
             "  1) Read <board_dir>/_system/AGENT-CONTEXT.md",
             f"  2) Ensure registered: <board_dir>/Agents/{status.agent_id}.md",
             f"  3) solaris agent plan-open --agent {status.agent_id} --title ... --project ...",
@@ -476,6 +539,7 @@ def blocking_message(status: GateStatus) -> str:
             "",
             "Check: solaris agent gate-status",
             "Dry-run: BOARD_GATE_DRY_RUN=1 or .cursor/agent-gate-config.json {\"dry_run\": true}",
+            "PRDs are soft (skill-guided); only plans+tickets are hard-gated.",
         ]
     )
     return "\n".join(lines)
@@ -485,11 +549,14 @@ def shell_allowed_while_blocked(cmd: str) -> bool:
     c = cmd.strip()
     if not c:
         return True
-    if re.search(r"board_agent\.py|board_task\.py|solaris\s+agent|solaris\s+task", c):
+    if re.search(
+        r"board_agent\.py|board_task\.py|solaris\s+agent|solaris\s+task|solaris\s+doctor",
+        c,
+    ):
         return True
     if re.match(
         r"^(ls|pwd|echo|whoami|date|rg|grep|find|cat|head|tail|less|wc|"
-        r"git\s+(status|diff|log|show|branch)|python3\s+-c\s+['\"]print)",
+        r"git\s+(status|diff|log|show|branch)|python3\s+-c\s+[\'\"]print)",
         c,
     ):
         return True
@@ -508,11 +575,9 @@ def decide_mutation(
     shell_cmd: str = "",
     gcfg: GateConfig | None = None,
 ) -> dict[str, Any]:
-    """Return a hook-style decision: {permission, agent_message?, user_message?}."""
     gcfg = gcfg or load_gate_config(paths)
     name = tool_name or ""
 
-    # Always-allow noise
     if file_paths and all(is_noise_path(paths, p) for p in file_paths):
         return {"permission": "allow"}
 
@@ -534,8 +599,6 @@ def decide_mutation(
         if all(is_bootstrap_write_path(paths, p) or is_noise_path(paths, p) for p in file_paths):
             return {"permission": "allow"}
         if status.ready:
-            # v1.5: task files for other agents/plans still allowed if bootstrap;
-            # non-bootstrap OK when session bound + ready
             return {"permission": "allow"}
         return _deny_or_dry(status, gcfg)
 
@@ -554,7 +617,6 @@ def _deny_or_dry(status: GateStatus, gcfg: GateConfig) -> dict[str, Any]:
 
 
 def reset_session_start(paths: GatePaths, agent_id: str) -> GateStatus:
-    """sessionStart: require re-read of rules; clear session bind."""
     state = load_state(paths)
     state.pop("rules_read_at", None)
     state["session_started_at"] = _now()

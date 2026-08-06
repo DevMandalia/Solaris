@@ -2,5 +2,6 @@
   "agent_id": "cursor-agent",
   "dry_run": false,
   "require_session_bind": true,
-  "auto_bind_single_plan": true
+  "auto_bind_single_plan": true,
+  "require_prd": false
 }

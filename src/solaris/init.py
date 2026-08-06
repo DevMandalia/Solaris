@@ -30,6 +30,84 @@ def _share_dir() -> Path:
     raise FileNotFoundError("Solaris data/ assets not found — reinstall the package")
 
 
+def install_cursor_gate(repo_root: Path, *, force: bool = False) -> Path:
+    """Install Cursor agent-board-gate hooks into a linked code repo (tag-along).
+
+    Vendors ``.cursor/lib/`` so system ``python3`` can import the gate without
+    ``pip install solaris`` (avoids fail-closed deadlock on import errors).
+    """
+    share = _share_dir()
+    cursor_src = share / "cursor"
+    if not cursor_src.is_dir():
+        raise FileNotFoundError("Packaged cursor gate assets missing")
+    repo_root = repo_root.expanduser().resolve()
+    cursor_dst = repo_root / ".cursor"
+    cursor_dst.mkdir(parents=True, exist_ok=True)
+    hooks_src = cursor_src / "hooks.json"
+    if hooks_src.is_file() and (force or not (cursor_dst / "hooks.json").exists()):
+        shutil.copy2(hooks_src, cursor_dst / "hooks.json")
+    cfg_src = cursor_src / "agent-gate-config.json"
+    if cfg_src.is_file() and (force or not (cursor_dst / "agent-gate-config.json").exists()):
+        shutil.copy2(cfg_src, cursor_dst / "agent-gate-config.json")
+    hooks_py_src = cursor_src / "hooks"
+    if hooks_py_src.is_dir():
+        (cursor_dst / "hooks").mkdir(exist_ok=True)
+        for py in hooks_py_src.glob("*.py"):
+            if force or not (cursor_dst / "hooks" / py.name).exists():
+                shutil.copy2(py, cursor_dst / "hooks" / py.name)
+
+    # Vendor gate modules for system python3 (PEP 668 / no global pip)
+    lib_dst = cursor_dst / "lib"
+    lib_dst.mkdir(exist_ok=True)
+    try:
+        pkg = Path(str(resources.files("solaris")))
+        for name, dest_name in (
+            ("agent_gate.py", "agent_gate.py"),
+            ("core.py", "board_core.py"),
+        ):
+            src = pkg / name
+            dest = lib_dst / dest_name
+            if src.is_file() and (force or not dest.exists()):
+                shutil.copy2(src, dest)
+        sol = lib_dst / "solaris"
+        sol.mkdir(exist_ok=True)
+        init_f = sol / "__init__.py"
+        if force or not init_f.exists():
+            init_f.write_text('__version__ = "0.1.5"\n', encoding="utf-8")
+        for name in ("agent_gate.py", "core.py"):
+            src = pkg / name
+            dest = sol / name
+            if src.is_file() and (force or not dest.exists()):
+                shutil.copy2(src, dest)
+    except Exception:
+        pass
+    return cursor_dst
+
+
+def write_solaris_toml(
+    repo_root: Path,
+    *,
+    board_root: Path,
+    repo_id: str = "",
+    force: bool = False,
+) -> Path:
+    """Write solaris.toml pointer in a code repo."""
+    repo_root = repo_root.expanduser().resolve()
+    dest = repo_root / "solaris.toml"
+    if dest.exists() and not force:
+        raise FileExistsError(f"Exists: {dest} (pass force=True to overwrite)")
+    br = str(board_root.expanduser().resolve())
+    lines = [
+        "# Solaris tag-along pointer — board/wiki live in board_root, not this repo",
+        f'board_root = "{br}"',
+    ]
+    if repo_id:
+        lines.append(f'repo_id = "{repo_id}"')
+    lines.append("")
+    dest.write_text("\n".join(lines), encoding="utf-8")
+    return dest
+
+
 def install_obsidian_scaffold(root: Path, *, force: bool = False) -> Path | None:
     """Write .obsidian/ with Bases (core), Base Board plugin, and Nebula theme.
 
@@ -528,8 +606,50 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Scaffold .obsidian/ with Bases, Base Board plugin, and Nebula theme",
     )
+    ap.add_argument(
+        "--link",
+        action="store_true",
+        help="Install Cursor gate hooks into a code repo (tag-along); does not scaffold a board",
+    )
+    ap.add_argument(
+        "--board-root",
+        type=Path,
+        default=None,
+        help="With --link: write solaris.toml pointing at this vault",
+    )
+    ap.add_argument(
+        "--repo-id",
+        default="",
+        help="With --link: repo_id for solaris.toml / linked_repos",
+    )
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args(argv)
+
+    if args.link:
+        root = args.root.expanduser().resolve()
+        try:
+            cursor = install_cursor_gate(root, force=args.force)
+        except FileNotFoundError as e:
+            print(e, file=__import__("sys").stderr)
+            return 1
+        print(f"Installed Cursor gate into {cursor}")
+        if args.board_root:
+            try:
+                toml = write_solaris_toml(
+                    root,
+                    board_root=args.board_root,
+                    repo_id=args.repo_id,
+                    force=args.force,
+                )
+                print(f"Wrote {toml}")
+            except FileExistsError as e:
+                print(e, file=__import__("sys").stderr)
+                return 1
+        else:
+            print("Tip: pass --board-root ~/Vault --repo-id myrepo to write solaris.toml")
+        print("Next: solaris doctor  (from the code repo)")
+        return 0
+
     try:
         root = init_board(
             args.root,
