@@ -66,6 +66,7 @@ def test_missing_pointer_fails_closed(tmp_path: Path, monkeypatch: pytest.Monkey
     monkeypatch.delenv("BOARD_ROOT", raising=False)
     empty = tmp_path / "empty"
     empty.mkdir()
+    # Walk-up may hit unreadable siblings under /tmp on CI; must not raise PermissionError.
     with pytest.raises(FileNotFoundError):
         resolve_board_root(empty)
 

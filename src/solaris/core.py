@@ -101,28 +101,50 @@ def _looks_like_board_config(path: Path) -> bool:
     )
 
 
+def _is_file(path: Path) -> bool:
+    """True if path is a regular file; treat permission/IO errors as absent."""
+    try:
+        return path.is_file()
+    except OSError:
+        return False
+
+
+def _is_dir(path: Path) -> bool:
+    try:
+        return path.is_dir()
+    except OSError:
+        return False
+
+
 def find_config_path(root: Path) -> Path | None:
     """Locate instance config under root (board.config.yml or <board_dir>/config.yml)."""
-    root = root.resolve()
+    try:
+        root = root.resolve()
+    except OSError:
+        return None
     alt = root / "board.config.yml"
-    if alt.is_file():
+    if _is_file(alt):
         return alt
 
     basename_cfg = root / root.name / "config.yml"
-    if basename_cfg.is_file() and _looks_like_board_config(basename_cfg):
+    if _is_file(basename_cfg) and _looks_like_board_config(basename_cfg):
         return basename_cfg
 
     legacy = root / "Board" / "config.yml"
-    if legacy.is_file():
+    if _is_file(legacy):
         return legacy
 
-    for child in sorted(root.iterdir(), key=lambda p: p.name.lower()):
-        if not child.is_dir() or child.name.startswith("."):
+    try:
+        children = sorted(root.iterdir(), key=lambda p: p.name.lower())
+    except OSError:
+        return None
+    for child in children:
+        if not _is_dir(child) or child.name.startswith("."):
             continue
         if child.name in ("node_modules", ".git", ".venv", "venv", "__pycache__"):
             continue
         cand = child / "config.yml"
-        if cand.is_file() and _looks_like_board_config(cand):
+        if _is_file(cand) and _looks_like_board_config(cand):
             return cand
     return None
 
@@ -153,10 +175,13 @@ def _parse_simple_toml(text: str) -> dict[str, str]:
 
 def find_solaris_pointer(start: Path | None = None) -> Path | None:
     """Walk up from start for solaris.toml or .solaris/config.toml."""
-    cur = (start or Path.cwd()).resolve()
+    try:
+        cur = (start or Path.cwd()).resolve()
+    except OSError:
+        return None
     for p in [cur, *cur.parents]:
         for cand in (p / "solaris.toml", p / ".solaris" / "config.toml"):
-            if cand.is_file():
+            if _is_file(cand):
                 return cand
     return None
 
