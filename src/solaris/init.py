@@ -73,7 +73,13 @@ def install_cursor_gate(repo_root: Path, *, force: bool = False) -> Path:
         sol.mkdir(exist_ok=True)
         init_f = sol / "__init__.py"
         if force or not init_f.exists():
-            init_f.write_text('__version__ = "0.1.5"\n', encoding="utf-8")
+            # Stamp the version actually being vendored. A hardcoded literal
+            # here silently mislabels every vendored copy after the next
+            # release, so `solaris doctor` (and humans) cannot tell a stale
+            # tag-along lib from a current one.
+            from solaris import __version__ as _pkg_version
+
+            init_f.write_text(f'__version__ = "{_pkg_version}"\n', encoding="utf-8")
         for name in ("agent_gate.py", "core.py"):
             src = pkg / name
             dest = sol / name
