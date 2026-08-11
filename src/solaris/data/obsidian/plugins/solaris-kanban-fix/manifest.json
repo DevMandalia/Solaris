@@ -1,0 +1,9 @@
+{
+  "id": "solaris-kanban-fix",
+  "name": "Solaris Kanban Fix",
+  "version": "1.0.0",
+  "minAppVersion": "1.10.0",
+  "description": "Registers Bases view type kanban if Base Board failed to (load-order fix).",
+  "author": "Solaris",
+  "isDesktopOnly": false
+}

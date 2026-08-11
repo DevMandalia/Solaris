@@ -12,6 +12,8 @@ from datetime import date
 from importlib import resources
 from pathlib import Path
 
+from solaris.banner import print_banner
+
 
 def _share_dir() -> Path:
     """Locate packaged data/ (templates, base, docs seeds)."""
@@ -115,10 +117,13 @@ def write_solaris_toml(
 
 
 def install_obsidian_scaffold(root: Path, *, force: bool = False) -> Path | None:
-    """Write .obsidian/ with Bases (core), Base Board plugin, and Nebula theme.
+    """Write .obsidian/ with Bases (core), Base Board, Solaris Kanban Fix, and Nebula.
 
     If `.obsidian/` already exists and force is False, leave it untouched and return None.
     With force=True, merge seed files into the existing vault config.
+
+    Note: Obsidian Restricted mode is vault UI state — users must turn it off once
+    so community plugins load (see docs/obsidian-kanban.md).
     """
     share = _share_dir()
     src = share / "obsidian"
@@ -140,6 +145,54 @@ def install_obsidian_scaffold(root: Path, *, force: bool = False) -> Path | None
     return dst
 
 
+def default_vault_path(code_root: Path) -> Path:
+    """Sibling directory ``<code-basename>-vault`` next to the code repo."""
+    code_root = code_root.expanduser().resolve()
+    return code_root.parent / f"{code_root.name}-vault"
+
+
+def git_init_repo(root: Path) -> None:
+    """``git init`` in *root* if it is not already a git work tree."""
+    import subprocess
+
+    root = root.expanduser().resolve()
+    if (root / ".git").exists():
+        return
+    subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
+
+
+def github_create_private(root: Path, *, repo_name: str) -> str | None:
+    """Create a private GitHub repo from *root* via ``gh``. Returns URL or None if skipped."""
+    import subprocess
+
+    root = root.expanduser().resolve()
+    try:
+        r = subprocess.run(
+            [
+                "gh",
+                "repo",
+                "create",
+                repo_name,
+                "--private",
+                "--source",
+                str(root),
+                "--remote",
+                "origin",
+                "--push",
+            ],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return None
+    if r.returncode != 0:
+        return None
+    out = (r.stdout or "").strip() or (r.stderr or "").strip()
+    return out.splitlines()[-1] if out else repo_name
+
+
 def init_board(
     root: Path,
     *,
@@ -148,6 +201,8 @@ def init_board(
     board_dir: str | None = None,
     force: bool = False,
     obsidian: bool = False,
+    linked_repo_id: str | None = None,
+    linked_repo_path: Path | None = None,
 ) -> Path:
     root = root.expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -214,6 +269,15 @@ def init_board(
             pass
 
     week = date.today().strftime("%G-W%V")
+    linked_block = ""
+    if linked_repo_id and linked_repo_path is not None:
+        lr_path = linked_repo_path.expanduser().resolve()
+        linked_block = (
+            "\n# Tag-along code repo (board/wiki stay in this vault)\n"
+            "linked_repos:\n"
+            f"  - id: {linked_repo_id}\n"
+            f"    path: {lr_path}\n"
+        )
     cfg_path.write_text(
         f"""# Solaris board instance config
 board_root: .
@@ -225,7 +289,7 @@ wiki_dir: Wiki
 agents_dir: {bd}/Agents
 agent_dashboard: {bd}/Agents/Agents Dashboard.md
 schema_version: 2
-
+{linked_block}
 projects:
   - folder: {project}
     name: {project}
@@ -539,6 +603,22 @@ Human capture scratch. Promote items into Triage / board tasks — board tasks a
         encoding="utf-8",
     )
 
+    obsidian_welcome = ""
+    if obsidian:
+        obsidian_welcome = f"""
+
+## Obsidian (kanban)
+
+Open **this folder** as a vault. On first open you **must** click through once:
+
+1. **Settings → Community plugins → Turn off Restricted mode**
+2. Enable **Base Board** and **Solaris Kanban Fix**
+3. Command palette → **Reload app without saving**
+4. Open [[{bd}/Home.base]]
+
+If you see `unknown view type: kanban`, Restricted mode is still on or Base Board is disabled. Classic “Kanban” plugins do not fix Bases boards. Full notes: Solaris repo `docs/obsidian-kanban.md`.
+"""
+
     (root / "Welcome.md").write_text(
         f"""---
 type: meta
@@ -570,6 +650,7 @@ To Do.md              human capture scratch
 ```
 
 CLI: `export BOARD_ROOT={root}` then `solaris task …` / `solaris agent …`
+{obsidian_welcome}
 """,
         encoding="utf-8",
     )
@@ -597,6 +678,17 @@ Do not put `source: agent` tasks in triage. After a plan is approved, create tic
     return root
 
 
+def _print_obsidian_first_open(vault_path: Path, board_dir: str) -> None:
+    """Human must disable Restricted mode once — cannot be automated via files."""
+    print(f"  Obsidian: Open folder as vault → {vault_path}")
+    print("  First open (required once — Obsidian Restricted mode cannot be disabled by files):")
+    print("    1. Settings → Community plugins → Turn off Restricted mode")
+    print("    2. Enable Base Board + Solaris Kanban Fix")
+    print("    3. Command palette → Reload app without saving")
+    print(f"    4. Open {board_dir}/Home.base")
+    print("  If 'unknown view type: kanban' → docs/obsidian-kanban.md")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Initialize a Solaris board")
     ap.add_argument("--root", type=Path, default=Path("."))
@@ -605,12 +697,31 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--board-dir",
         default=None,
-        help="Board folder name (default: basename of --root)",
+        help="Board folder name (default: basename of vault root; with --vault-repo default Board)",
     )
     ap.add_argument(
         "--obsidian",
         action="store_true",
         help="Scaffold .obsidian/ with Bases, Base Board plugin, and Nebula theme",
+    )
+    ap.add_argument(
+        "--vault-repo",
+        action="store_true",
+        help=(
+            "Create a sibling Obsidian vault git repo (tag-along); board/wiki/.obsidian "
+            "stay out of the code repo. Writes solaris.toml in --root (the code repo)."
+        ),
+    )
+    ap.add_argument(
+        "--vault-path",
+        type=Path,
+        default=None,
+        help="With --vault-repo: vault directory (default: <code-basename>-vault beside --root)",
+    )
+    ap.add_argument(
+        "--github",
+        action="store_true",
+        help="With --vault-repo: also `gh repo create` (private) and push the vault",
     )
     ap.add_argument(
         "--link",
@@ -626,10 +737,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--repo-id",
         default="",
-        help="With --link: repo_id for solaris.toml / linked_repos",
+        help="repo_id for solaris.toml / linked_repos (with --link or --vault-repo)",
     )
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args(argv)
+
+    if args.link and args.vault_repo:
+        print("Use either --link or --vault-repo, not both", file=__import__("sys").stderr)
+        return 1
 
     if args.link:
         root = args.root.expanduser().resolve()
@@ -638,6 +753,7 @@ def main(argv: list[str] | None = None) -> int:
         except FileNotFoundError as e:
             print(e, file=__import__("sys").stderr)
             return 1
+        print_banner()
         print(f"Installed Cursor gate into {cursor}")
         if args.board_root:
             try:
@@ -656,6 +772,119 @@ def main(argv: list[str] | None = None) -> int:
         print("Next: solaris doctor  (from the code repo)")
         return 0
 
+    if args.vault_repo:
+        code_root = args.root.expanduser().resolve()
+        code_root.mkdir(parents=True, exist_ok=True)
+        vault = (
+            args.vault_path.expanduser().resolve()
+            if args.vault_path
+            else default_vault_path(code_root)
+        )
+        if vault.resolve() == code_root.resolve():
+            print(
+                "--vault-path must differ from the code repo (--root)",
+                file=__import__("sys").stderr,
+            )
+            return 1
+        if vault.exists() and any(vault.iterdir()) and not args.force:
+            # Allow empty dir; block non-empty without --force
+            print(
+                f"Vault path already exists and is not empty: {vault} (pass --force)",
+                file=__import__("sys").stderr,
+            )
+            return 1
+        repo_id = (args.repo_id or code_root.name).strip() or "app"
+        board_dir = args.board_dir or "Board"
+        try:
+            vault_root = init_board(
+                vault,
+                name=args.name,
+                project=args.project,
+                board_dir=board_dir,
+                force=args.force,
+                obsidian=args.obsidian,
+                linked_repo_id=repo_id,
+                linked_repo_path=code_root,
+            )
+        except FileExistsError as e:
+            print(e, file=__import__("sys").stderr)
+            return 1
+
+        readme = vault_root / "README.md"
+        if args.force or not readme.exists():
+            readme.write_text(
+                f"""# {args.name} vault
+
+Obsidian / Solaris board vault (tag-along). Product code: `{code_root}`.
+
+```bash
+export BOARD_ROOT={vault_root}
+solaris doctor
+```
+
+Open this folder as an Obsidian vault (not the code repo).
+
+## First open (kanban)
+
+Obsidian Restricted mode blocks vendored plugins until you allow them once:
+
+1. Settings → Community plugins → **Turn off Restricted mode**
+2. Enable **Base Board** + **Solaris Kanban Fix**
+3. Reload app → open `{board_dir}/Home.base`
+
+If you see `unknown view type: kanban`, see Solaris `docs/obsidian-kanban.md`.
+""",
+                encoding="utf-8",
+            )
+
+        try:
+            git_init_repo(vault_root)
+        except Exception as e:
+            print(f"WARN: git init failed: {e}", file=__import__("sys").stderr)
+
+        try:
+            toml = write_solaris_toml(
+                code_root,
+                board_root=vault_root,
+                repo_id=repo_id,
+                force=args.force,
+            )
+        except FileExistsError as e:
+            print(e, file=__import__("sys").stderr)
+            return 1
+
+        try:
+            install_cursor_gate(code_root, force=args.force)
+        except FileNotFoundError:
+            pass
+
+        gh_url = None
+        if args.github:
+            gh_url = github_create_private(vault_root, repo_name=vault_root.name)
+
+        project = args.project or args.name
+        print_banner()
+        print(f"Initialized tag-along vault at {vault_root}")
+        print(f"  board_dir: {board_dir}")
+        print(f"  project: {project}")
+        print(f"  linked_repos: id={repo_id} path={code_root}")
+        print(f"  code pointer: {toml}")
+        if args.obsidian:
+            print("  obsidian: .obsidian/ (Bases + Base Board + Solaris Kanban Fix + Nebula)")
+        if gh_url:
+            print(f"  github: {gh_url}")
+        elif args.github:
+            print("  github: skipped (gh missing or create failed)")
+        print("Next:")
+        print(f"  cd {code_root} && solaris doctor")
+        print(f"  export BOARD_ROOT={vault_root}")
+        if args.obsidian:
+            _print_obsidian_first_open(vault_root, board_dir)
+        print(
+            f'  solaris task create --title "First task" --project "{project}" --build'
+        )
+        return 0
+
     try:
         root = init_board(
             args.root,
@@ -671,15 +900,16 @@ def main(argv: list[str] | None = None) -> int:
     project = args.project or args.name
     root = root.resolve()
     bd = (args.board_dir or root.name).strip().strip("/") or "Board"
+    print_banner()
     print(f"Initialized Solaris board at {root}")
     print(f"  board_dir: {bd}")
     print(f"  project: {project}")
     if args.obsidian:
-        print("  obsidian: .obsidian/ (Bases + Base Board + Nebula)")
+        print("  obsidian: .obsidian/ (Bases + Base Board + Solaris Kanban Fix + Nebula)")
     print("Next:")
     print(f"  export BOARD_ROOT={root}")
     if args.obsidian:
-        print("  Install Obsidian.app (see README), then: Open folder as vault → this directory")
+        _print_obsidian_first_open(root, bd)
     print(
         f'  solaris task create --title "First task" --project "{project}" --build'
     )

@@ -145,9 +145,16 @@ def test_init_obsidian_scaffold(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     assert (root / ".obsidian" / "appearance.json").is_file()
     assert "Nebula" in (root / ".obsidian" / "appearance.json").read_text()
     assert (root / ".obsidian" / "plugins" / "base-board" / "main.js").is_file()
+    assert (root / ".obsidian" / "plugins" / "solaris-kanban-fix" / "main.js").is_file()
+    enabled = (root / ".obsidian" / "community-plugins.json").read_text()
+    assert "base-board" in enabled
+    assert "solaris-kanban-fix" in enabled
     assert (root / ".obsidian" / "themes" / "Nebula" / "theme.css").is_file()
     cores = (root / ".obsidian" / "core-plugins.json").read_text()
     assert '"bases": true' in cores or '"bases":true' in cores
+    welcome = (root / "Welcome.md").read_text(encoding="utf-8")
+    assert "Turn off Restricted mode" in welcome
+    assert "unknown view type: kanban" in welcome
     # without --obsidian, no .obsidian
     root2 = tmp_path / "CliOnly"
     root2.mkdir()

@@ -2328,12 +2328,40 @@ var BaseBoardPlugin = class extends import_obsidian8.Plugin {
   }
   async onload() {
     await this.loadPluginData();
-    this.registerBasesView("kanban", {
-      name: "Kanban",
-      icon: "lucide-kanban",
-      factory: (controller, containerEl) => new KanbanView(controller, containerEl, this),
-      options: () => KanbanView.getViewOptions()
-    });
+    const registerKanban = () => {
+      try {
+        return !!this.registerBasesView("kanban", {
+          name: "Kanban",
+          icon: "lucide-kanban",
+          factory: (controller, containerEl) => new KanbanView(controller, containerEl, this),
+          options: () => KanbanView.getViewOptions()
+        });
+      } catch (err) {
+        console.error("Base Board: registerBasesView threw", err);
+        return false;
+      }
+    };
+    if (!registerKanban()) {
+      console.warn("Base Board: Bases not ready; will retry");
+      this.app.workspace.onLayoutReady(() => {
+        const tryReg = () => {
+          if (registerKanban()) {
+            new import_obsidian8.Notice("Base Board: Kanban registered. Close and reopen Home.base.");
+            return true;
+          }
+          return false;
+        };
+        if (!tryReg()) {
+          window.setTimeout(() => {
+            if (!tryReg()) {
+              new import_obsidian8.Notice("Base Board FAILED to register Kanban. Settings→Core plugins→enable Bases, then reload.");
+            }
+          }, 2000);
+        }
+      });
+    } else {
+      console.info("Base Board: Kanban view registered OK");
+    }
     this.addCommand({
       id: "create-board",
       name: "Create new board",

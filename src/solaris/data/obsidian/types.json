@@ -1,0 +1,21 @@
+{
+  "types": {
+    "type": "text",
+    "title": "text",
+    "status": "text",
+    "domain": "text",
+    "project": "text",
+    "priority": "text",
+    "phase": "text",
+    "blocked_reason": "text",
+    "created": "date",
+    "updated": "date",
+    "due": "date",
+    "tags": "tags",
+    "kanban_order": "number",
+    "sprint": "text",
+    "carry": "checkbox",
+    "source": "text",
+    "lane": "text"
+  }
+}

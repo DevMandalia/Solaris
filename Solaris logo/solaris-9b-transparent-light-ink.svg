@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 340" width="1200" height="340">
+<defs><clipPath id="clip-8b"><text x="600" y="262" text-anchor="middle" font-family="&#39;Alfa Slab One&#39;, serif" font-size="270">Solaris</text></clipPath><mask id="knock-o"><rect x="0" y="0" width="1200" height="340" fill="#fff"></rect><rect x="293" y="100" width="164" height="178" fill="#000"></rect></mask></defs>
+
+
+    <g mask="url(#knock-o)"><g clip-path="url(#clip-8b)"><g id="beams-sunset">
+      <rect x="0" y="0" width="1200" height="340" fill="#e8b53c"></rect>
+      <rect x="0" y="100" width="1200" height="8" fill="#f8ecd6"></rect>
+      <rect x="0" y="108" width="1200" height="68" fill="#e8703a"></rect>
+      <rect x="0" y="176" width="1200" height="7" fill="#f8ecd6"></rect>
+      <rect x="0" y="183" width="1200" height="58" fill="#c8461f"></rect>
+      <rect x="0" y="241" width="1200" height="5" fill="#f8ecd6"></rect>
+      <rect x="0" y="246" width="1200" height="44" fill="#a4351a"></rect>
+      <rect x="0" y="290" width="1200" height="4" fill="#f8ecd6"></rect>
+      <rect x="0" y="294" width="1200" height="46" fill="#7a2814"></rect>
+    </g></g>
+    <text x="600" y="262" text-anchor="middle" font-family="&#39;Alfa Slab One&#39;, serif" font-size="270" fill="none" stroke="#f2e0c0" stroke-width="7">Solaris</text></g>
+    
+    <g stroke-linejoin="miter">
+      <circle cx="373" cy="184" r="74" fill="none" stroke="#c8461f" stroke-width="17"></circle>
+      <circle cx="373" cy="184" r="83" fill="none" stroke="#f2e0c0" stroke-width="5"></circle>
+      <circle cx="373" cy="184" r="65" fill="none" stroke="#f2e0c0" stroke-width="5"></circle>
+      <path d="M435.0 184.0L425.0 184.0M432.9 200.0L423.2 197.5M426.7 215.0L418.0 210.0M416.8 227.8L409.8 220.8M404.0 237.7L399.0 229.0M389.0 243.9L386.5 234.2M373.0 246.0L373.0 236.0M357.0 243.9L359.5 234.2M342.0 237.7L347.0 229.0M329.2 227.8L336.2 220.8M319.3 215.0L328.0 210.0M313.1 200.0L322.8 197.5M311.0 184.0L321.0 184.0M313.1 168.0L322.8 170.5M319.3 153.0L328.0 158.0M329.2 140.2L336.2 147.2M342.0 130.3L347.0 139.0M357.0 124.1L359.5 133.8M373.0 122.0L373.0 132.0M389.0 124.1L386.5 133.8M404.0 130.3L399.0 139.0M416.8 140.2L409.8 147.2M426.7 153.0L418.0 158.0M432.9 168.0L423.2 170.5" stroke="#f2e0c0" stroke-width="4"></path>
+      <path d="M373.0 70.0L356.0 167.0L373 184ZM414.0 143.0L373.0 160.0L373 184ZM453.0 184.0L390.0 167.0L373 184ZM414.0 225.0L397.0 184.0L373 184ZM373.0 298.0L390.0 201.0L373 184ZM332.0 225.0L373.0 208.0L373 184ZM293.0 184.0L356.0 201.0L373 184ZM332.0 143.0L349.0 184.0L373 184Z" fill="#e8b53c" stroke="#f2e0c0" stroke-width="4"></path>
+      <path d="M373.0 70.0L373 184L390.0 167.0ZM414.0 143.0L373 184L397.0 184.0ZM453.0 184.0L373 184L390.0 201.0ZM414.0 225.0L373 184L373.0 208.0ZM373.0 298.0L373 184L356.0 201.0ZM332.0 225.0L373 184L349.0 184.0ZM293.0 184.0L373 184L356.0 167.0ZM332.0 143.0L373 184L373.0 160.0Z" fill="#c8461f" stroke="#f2e0c0" stroke-width="4"></path>
+      <circle cx="373" cy="184" r="26" fill="#e8b53c" stroke="#f2e0c0" stroke-width="5"></circle>
+    </g>
+  
+</svg>

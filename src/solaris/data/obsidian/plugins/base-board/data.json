@@ -1,1 +1,57 @@
-{}
+{
+  "columnConfigs": {
+    "dsky/Tasks::Home::lane": {
+      "columns": [
+        "backlog",
+        "doing this week",
+        "in progress now",
+        "blocked",
+        "done"
+      ]
+    },
+    "dsky/Tasks::Flow::lane": {
+      "columns": [
+        "backlog",
+        "doing this week",
+        "in progress now",
+        "blocked",
+        "done"
+      ]
+    },
+    "dsky/Tasks/Trading::Trading::lane": {
+      "columns": [
+        "backlog",
+        "doing this week",
+        "in progress now",
+        "blocked",
+        "done"
+      ]
+    },
+    "dsky/Tasks/Strategy::Strategy::lane": {
+      "columns": [
+        "backlog",
+        "doing this week",
+        "in progress now",
+        "blocked",
+        "done"
+      ]
+    },
+    "dsky/Tasks/Broker::Broker::lane": {
+      "columns": [
+        "backlog",
+        "doing this week",
+        "in progress now",
+        "blocked",
+        "done"
+      ]
+    },
+    "dsky/Tasks::Agent work::lane": {
+      "columns": [
+        "todo",
+        "in-progress",
+        "blocked",
+        "done"
+      ]
+    }
+  }
+}

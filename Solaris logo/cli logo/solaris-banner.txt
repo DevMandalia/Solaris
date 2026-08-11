@@ -1,0 +1,2 @@
+  (*) solaris  v1.0.0
+  > solaris init --star polaris

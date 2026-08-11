@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **`--vault-repo`** — `solaris init --obsidian --vault-repo` creates a sibling Obsidian vault git repo (tag-along) + `solaris.toml` in the code repo
+- **Solaris Kanban Fix** plugin in Obsidian seed — retries Bases `kanban` registration; docs: `docs/obsidian-kanban.md`
+- Welcome + init CLI checklist for **Restricted mode** (must be turned off once per vault)
+
+### Changed
+
+- Obsidian seed: vendored Base Board refreshed; `community-plugins.json` enables Base Board + Solaris Kanban Fix
+
 ## [0.1.6] — 2026-08-05
 
 ### Added

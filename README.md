@@ -72,11 +72,29 @@ The separate note-taking agent uses **`solaris-agent`** (`hermes -p solaris`) �
 
 ## Quick start
 
+**Recommended (tag-along vault — Obsidian vault is its own git repo):**
+
 ```bash
-# In any project directory
+# From your application / code repo
+solaris init --name MyApp --project Eng --obsidian --vault-repo
+# creates sibling ~/…/MyApp-vault + solaris.toml in the code repo
+cd /path/to/MyApp   # code repo
+solaris doctor
+export BOARD_ROOT=/path/to/MyApp-vault
+
+# Obsidian → Open folder as vault → MyApp-vault (not the code repo)
+```
+
+Optional: `--vault-path ~/custom-vault`, `--github` (`gh repo create` private), `--repo-id myapp`.
+
+**In-repo board (single folder experiments):**
+
+```bash
 solaris init --name MyApp --project Eng --obsidian
 export BOARD_ROOT=$PWD
+```
 
+```bash
 # If you used --obsidian: install Obsidian.app (above), then
 # Obsidian → Open folder as vault → this directory
 # Allow community plugins if prompted (Base Board). Theme: Nebula.
@@ -96,6 +114,14 @@ solaris export --include-done
 
 ### Vault mode (Obsidian)
 
+**Preferred:** separate vault repo via `--vault-repo` (see Quick start).
+
+```bash
+solaris init --name MyApp --project Eng --obsidian --vault-repo
+```
+
+Or scaffold into the current directory:
+
 ```bash
 solaris init --name MyApp --project Eng --obsidian
 ```
@@ -103,10 +129,20 @@ solaris init --name MyApp --project Eng --obsidian
 Creates the board files **plus** `.obsidian/` with:
 
 - **Bases** (core plugin) enabled  
-- **Base Board** community plugin vendored  
+- **Base Board** community plugin vendored (registers Bases `kanban`)  
+- **Solaris Kanban Fix** (retries `kanban` registration if Base Board loses load-order)  
 - **Nebula** theme selected  
 
-Then install Obsidian.app (see above) → **Open folder as vault** on the repo root → open `<board_dir>/Home.base` / Dashboard.
+Then install Obsidian.app (see above) → **Open folder as vault** on the **vault** root → open `<board_dir>/Home.base` / Dashboard.
+
+**First open (required once):** Obsidian starts new vaults in **Restricted mode**, which blocks community plugins even when they are vendored on disk. Turn it off or you get `unknown view type: kanban`:
+
+1. Settings → Community plugins → **Turn off Restricted mode**
+2. Enable **Base Board** + **Solaris Kanban Fix**
+3. Command palette → **Reload app without saving**
+4. Open `<board_dir>/Home.base`
+
+Full troubleshooting: [docs/obsidian-kanban.md](docs/obsidian-kanban.md).
 
 Without `--obsidian`, you still get markdown + `Home.base`; open the folder as a vault manually and install plugins/themes yourself.
 
@@ -173,7 +209,9 @@ Details: [docs/safety.md](docs/safety.md).
 ## CLI reference
 
 ```
-solaris init [--root DIR] [--name NAME] [--project NAME] [--force]
+solaris init [--root DIR] [--name NAME] [--project NAME] [--obsidian] [--vault-repo]
+             [--vault-path DIR] [--github] [--repo-id ID] [--force]
+solaris init --link [--root DIR] [--board-root VAULT] [--repo-id ID]
 solaris agent register --id ID --name N --model M --owner O
 solaris agent plan-open --agent ID --title T --project P [--initiative-id I]
 solaris agent plan-close PLAN_ID --lines-added N --lines-removed N --prs N

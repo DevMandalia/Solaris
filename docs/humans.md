@@ -75,3 +75,7 @@ Human/inbox captures land here — **not** agent execution tickets.
 | Cancel → done | → archived |
 | Hand-edit sprint after drag | Drag the lane |
 | Clear every agent ticket | Treat board as ledger |
+
+## Obsidian kanban broken (`unknown view type: kanban`)
+
+Restricted mode blocks vendored plugins until you allow community plugins once. See [obsidian-kanban.md](obsidian-kanban.md).
