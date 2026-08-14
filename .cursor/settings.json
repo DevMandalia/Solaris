@@ -1,0 +1,7 @@
+{
+  "plugins": {
+    "pr-review-canvas": {
+      "enabled": true
+    }
+  }
+}

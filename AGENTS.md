@@ -12,12 +12,12 @@ When contributing to or using Solaris itself:
 | Plane | System | Role |
 |---|---|---|
 | Fact | DSKY Turso | Money / audit |
-| Memory | Team-Memory (+ Mem0 failover) | Lessons, skills, prefs — **only** memory SoR |
+| Memory | Team-Memory (Railway) | Lessons, skills, prefs — **only** memory SoR |
 | Work + record | This board/wiki (Dragonstone or other vault) | Kanban, PRDs, plans, tickets, agent performance |
 | Code | Linked repos (`solaris.toml` → `board_root`) | Patches / PRs |
 
 - Protocol: `~/Dragonstone/Wiki/Dragonstone Ops/Team-Memory/protocol.md`
-- MCP: `team-memory` (MacBook Tencent) + `team-memory-failover` (Mem0 cloud)
+- MCP: `team-memory` (Railway primary; Mem0 failover removed 2026-08-14)
 - No A2A; correct via PR + board; DSKY Turso wins for financial facts
 - **Solaris is not a memory layer.** Do not store Chat Memory under the vault. Skills SoR = Team-Memory; wiki prose SoR = `Wiki/`
 - Tag-along: code repos use `solaris.toml`; run `solaris doctor` to verify binding
