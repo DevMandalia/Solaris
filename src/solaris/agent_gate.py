@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -389,6 +390,20 @@ def _board_imports(root: Path):
     return iter_agent_plan_files, iter_task_files, load_config, parse_frontmatter, unquote
 
 
+def _read_text_or_skip(path: Path) -> str | None:
+    """UTF-8 text of a scanned file, or None after a stderr warning.
+
+    Kept local rather than imported from core: this module is vendored
+    standalone next to whichever `board_core.py` is on the path, so it must
+    not depend on core symbols newer than the gate API it already uses.
+    """
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        print(f"warning: skipping unreadable file {path}: {exc}", file=sys.stderr)
+        return None
+
+
 def compute_status(paths: GatePaths, gcfg: GateConfig | None = None) -> GateStatus:
     gcfg = gcfg or load_gate_config(paths)
     os.environ.setdefault("BOARD_ROOT", str(paths.board_root))
@@ -403,7 +418,10 @@ def compute_status(paths: GatePaths, gcfg: GateConfig | None = None) -> GateStat
 
     open_plans: list[dict[str, str]] = []
     for path in iter_agent_plan_files(cfg):
-        fm, _t, _b = parse_frontmatter(path.read_text(encoding="utf-8"))
+        text = _read_text_or_skip(path)
+        if text is None:
+            continue
+        fm, _t, _b = parse_frontmatter(text)
         if unquote(fm.get("agent_id", "")) != gcfg.agent_id:
             continue
         if unquote(fm.get("status", "")) != "open":
@@ -450,7 +468,10 @@ def compute_status(paths: GatePaths, gcfg: GateConfig | None = None) -> GateStat
     task_paths: list[str] = []
     if plan_ids:
         for path in iter_task_files(cfg):
-            fm, _t, _b = parse_frontmatter(path.read_text(encoding="utf-8"))
+            text = _read_text_or_skip(path)
+            if text is None:
+                continue
+            fm, _t, _b = parse_frontmatter(text)
             if unquote(fm.get("type", "")) != "task":
                 continue
             if unquote(fm.get("agent_id", "")) != gcfg.agent_id:

@@ -10,6 +10,7 @@ from pathlib import Path
 from solaris.core import (
     find_config_path,
     find_solaris_pointer,
+    iter_board_markdown,
     load_config,
     load_solaris_pointer,
     resolve_board_root,
@@ -73,7 +74,7 @@ def run_doctor(start: Path | None = None) -> int:
     print(f"gate config (board): {'yes' if board_gate.is_file() else 'no'}")
     print(f"gate config (cwd): {'yes' if ws_gate.is_file() else 'no'}")
 
-    agents = list(cfg.agents_dir.glob("*.md")) if cfg.agents_dir.is_dir() else []
+    agents = iter_board_markdown(cfg.agents_dir, recursive=False)
     skip = {
         "Agents Dashboard.md",
         "Dashboard.md",

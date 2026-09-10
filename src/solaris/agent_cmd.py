@@ -33,9 +33,11 @@ from solaris.core import (
     find_agent_plan,
     infer_lane,
     iter_agent_plan_files,
+    iter_board_markdown,
     iter_task_files,
     load_config,
     parse_frontmatter,
+    read_board_text,
     render_frontmatter,
     slugify,
     unquote,
@@ -74,7 +76,14 @@ def _require_agent(cfg, agent_id: str) -> Path:
 
 
 def _read_md(path: Path) -> tuple[dict[str, str], list[str], str]:
+    """Read one explicitly targeted file; an unreadable target is a real error."""
     return parse_frontmatter(path.read_text(encoding="utf-8"))
+
+
+def _read_md_or_skip(path: Path) -> tuple[dict[str, str], list[str], str] | None:
+    """Read one file found by a directory scan; unreadable files are skipped with a warning."""
+    text = read_board_text(path)
+    return None if text is None else parse_frontmatter(text)
 
 
 def _write_md(path: Path, fm: dict[str, str], body: str) -> None:
@@ -205,8 +214,10 @@ def cmd_plan_open(args: argparse.Namespace) -> int:
 def _tasks_for_plan(cfg, plan_id: str) -> list[tuple[Path, dict[str, str]]]:
     rows = []
     for path in iter_task_files(cfg):
-        text = path.read_text(encoding="utf-8")
-        fm, _tags, _ = parse_frontmatter(text)
+        parsed = _read_md_or_skip(path)
+        if parsed is None:
+            continue
+        fm, _tags, _ = parsed
         if unquote(fm.get("type", "")) != "task":
             continue
         if unquote(fm.get("plan_id", "")) != plan_id:
@@ -323,9 +334,11 @@ def _iter_agents(cfg) -> list[Path]:
         "Agent-Context.md",
         "INSTANCE.md",
     }
-    return sorted(
-        p for p in cfg.agents_dir.glob("*.md") if p.is_file() and p.name not in skip
-    )
+    return [
+        p
+        for p in iter_board_markdown(cfg.agents_dir, recursive=False)
+        if p.is_file() and p.name not in skip
+    ]
 
 
 def _metric_box(value: str, label: str, *, wide: bool = False) -> str:
@@ -341,7 +354,10 @@ def _metric_box(value: str, label: str, *, wide: bool = False) -> str:
 def _agent_roster_html(cfg) -> str:
     cards: list[str] = []
     for path in _iter_agents(cfg):
-        fm, _t, _b = _read_md(path)
+        parsed = _read_md_or_skip(path)
+        if parsed is None:
+            continue
+        fm, _t, _b = parsed
         if unquote(fm.get("type", "")) != "agent":
             continue
         aid = unquote(fm.get("agent_id", path.stem))
@@ -402,7 +418,10 @@ def _agent_roster_html(cfg) -> str:
 def _open_plans_section(cfg) -> str:
     lines = []
     for path in iter_agent_plan_files(cfg):
-        fm, _t, _b = _read_md(path)
+        parsed = _read_md_or_skip(path)
+        if parsed is None:
+            continue
+        fm, _t, _b = parsed
         if unquote(fm.get("status", "")) != "open":
             continue
         # Prefer wiki plans over legacy Board/Agents/Plans duplicates
@@ -586,7 +605,10 @@ def cmd_list(args: argparse.Namespace) -> int:
     if args.plans:
         n = 0
         for path in iter_agent_plan_files(cfg):
-            fm, _t, _b = _read_md(path)
+            parsed = _read_md_or_skip(path)
+            if parsed is None:
+                continue
+            fm, _t, _b = parsed
             status = unquote(fm.get("status", ""))
             if args.open and status != "open":
                 continue
@@ -607,7 +629,10 @@ def cmd_list(args: argparse.Namespace) -> int:
 
     n = 0
     for path in _iter_agents(cfg):
-        fm, _t, _b = _read_md(path)
+        parsed = _read_md_or_skip(path)
+        if parsed is None:
+            continue
+        fm, _t, _b = parsed
         if unquote(fm.get("type", "")) != "agent":
             continue
         print(

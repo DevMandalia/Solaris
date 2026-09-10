@@ -14,6 +14,10 @@ All notable changes to this project will be documented in this file.
 
 - Obsidian seed: vendored Base Board refreshed; `community-plugins.json` enables Base Board + Solaris Kanban Fix
 
+### Fixed
+
+- Boards on exFAT / FAT / SMB volumes: macOS AppleDouble `._<name>.md` sidecars and `.DS_Store` are now skipped by every directory scan (`task list`, `export`, `agent list --plans`, `gate-status`, `sync`, `rollover`, `rollup`, `doctor`, and the `task create` slug set) instead of aborting the CLI with `UnicodeDecodeError`. A single unreadable or non-UTF-8 file is skipped with a warning on stderr rather than failing the whole command.
+
 ## [0.1.6] — 2026-08-05
 
 ### Added

@@ -17,6 +17,7 @@ from solaris.core import (
     load_config,
     parse_frontmatter,
     patch_home_base_sprint_filter,
+    read_board_text,
     render_frontmatter,
     set_active_sprint,
     sprint_folder_name,
@@ -91,7 +92,9 @@ def run(*, dry_run: bool, force: bool, seed_only: bool = False) -> int:
     )
     to_carry: list[Path] = []
     for path in iter_task_files(cfg):
-        text = path.read_text(encoding="utf-8")
+        text = read_board_text(path)
+        if text is None:
+            continue
         fm, tags, body = parse_frontmatter(text)
         if unquote(fm.get("type", "")) != "task":
             continue

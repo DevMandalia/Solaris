@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -114,6 +115,47 @@ def _is_dir(path: Path) -> bool:
         return path.is_dir()
     except OSError:
         return False
+
+
+# macOS writes an AppleDouble sidecar (`._<name>`) next to every file it touches
+# on exFAT / FAT / SMB volumes, and Finder drops `.DS_Store` into folders. Both
+# are binary. The sidecar keeps the original suffix, so a bare `*.md` glob picks
+# up `._card.md` and `read_text(encoding="utf-8")` aborts the whole command.
+_SIDECAR_PREFIX = "._"
+_SIDECAR_NAMES = frozenset({".DS_Store"})
+
+
+def is_board_markdown(path: Path) -> bool:
+    """True for a markdown file the board should read; False for OS sidecars."""
+    name = path.name
+    if name.startswith(_SIDECAR_PREFIX) or name in _SIDECAR_NAMES:
+        return False
+    return name.lower().endswith(".md")
+
+
+def iter_board_markdown(root: Path, pattern: str = "*.md", *, recursive: bool = True) -> list[Path]:
+    """Sorted markdown files matching pattern under root, with OS sidecars removed.
+
+    Every directory scan for tasks, plans, agents, or initiative hubs goes
+    through here so the sidecar rule lives in one place.
+    """
+    if not _is_dir(root):
+        return []
+    found = root.rglob(pattern) if recursive else root.glob(pattern)
+    return sorted(p for p in found if is_board_markdown(p))
+
+
+def read_board_text(path: Path) -> str | None:
+    """UTF-8 text of a board file, or None after a stderr warning if unreadable.
+
+    Scans call this instead of `read_text` so one undecodable or unreadable
+    file is skipped rather than aborting the command.
+    """
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        print(f"warning: skipping unreadable file {path}: {exc}", file=sys.stderr)
+        return None
 
 
 def find_config_path(root: Path) -> Path | None:
@@ -708,13 +750,11 @@ def folder_for_project(cfg: BoardConfig, project: str) -> str:
 
 
 def iter_task_files(cfg: BoardConfig) -> list[Path]:
-    if not cfg.tasks_dir.is_dir():
-        return []
-    return sorted(
+    return [
         p
-        for p in cfg.tasks_dir.rglob("*.md")
+        for p in iter_board_markdown(cfg.tasks_dir)
         if "_archive" not in p.parts and p.name != "README.md"
-    )
+    ]
 
 
 def iter_agent_plan_files(cfg: BoardConfig) -> list[Path]:
@@ -734,14 +774,13 @@ def iter_agent_plan_files(cfg: BoardConfig) -> list[Path]:
     out: list[Path] = []
     seen: set[Path] = set()
     for root in roots:
-        for path in root.rglob("*.md"):
+        for path in iter_board_markdown(root):
             if "Plans" not in path.parts:
                 continue
             if path in seen:
                 continue
-            try:
-                text = path.read_text(encoding="utf-8")
-            except OSError:
+            text = read_board_text(path)
+            if text is None:
                 continue
             fm, _tags, _body = parse_frontmatter(text)
             typ = unquote(fm.get("type", ""))
@@ -754,7 +793,10 @@ def iter_agent_plan_files(cfg: BoardConfig) -> list[Path]:
 def find_agent_plan(cfg: BoardConfig, plan_id: str) -> Path | None:
     plan_id = plan_id.strip()
     for path in iter_agent_plan_files(cfg):
-        fm, _t, _b = parse_frontmatter(path.read_text(encoding="utf-8"))
+        text = read_board_text(path)
+        if text is None:
+            continue
+        fm, _t, _b = parse_frontmatter(text)
         if unquote(fm.get("plan_id", "")) == plan_id or path.stem == plan_id:
             return path
     return None
@@ -827,7 +869,9 @@ def export_board_markdown(
     ]
     by_lane: dict[str, list[str]] = defaultdict(list)
     for path in iter_task_files(cfg):
-        text = path.read_text(encoding="utf-8")
+        text = read_board_text(path)
+        if text is None:
+            continue
         fm, _, _ = parse_frontmatter(text)
         if unquote(fm.get("type", "")) != "task":
             continue
