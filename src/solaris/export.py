@@ -15,6 +15,7 @@ from solaris.core import (  # noqa: E402
     iter_task_files,
     load_config,
     parse_frontmatter,
+    read_board_text,
     unquote,
 )
 
@@ -39,7 +40,9 @@ def main() -> int:
     cfg = load_config()
     by_lane: dict[str, list[str]] = defaultdict(list)
     for path in iter_task_files(cfg):
-        text = path.read_text(encoding="utf-8")
+        text = read_board_text(path)
+        if text is None:
+            continue
         fm, _, _ = parse_frontmatter(text)
         if unquote(fm.get("type", "")) != "task":
             continue

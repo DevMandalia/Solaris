@@ -15,9 +15,11 @@ from pathlib import Path
 from solaris.core import (  # noqa: E402
     TODAY,
     infer_lane,
+    iter_board_markdown,
     iter_task_files,
     load_config,
     parse_frontmatter,
+    read_board_text,
     render_frontmatter,
     unquote,
 )
@@ -27,10 +29,12 @@ def _initiative_indexes(cfg) -> dict[str, Path]:
     found: dict[str, Path] = {}
     if not cfg.wiki_dir or not cfg.wiki_dir.is_dir():
         return found
-    for path in cfg.wiki_dir.rglob("index.md"):
+    for path in iter_board_markdown(cfg.wiki_dir, "index.md"):
         if "Initiatives" not in path.parts:
             continue
-        text = path.read_text(encoding="utf-8")
+        text = read_board_text(path)
+        if text is None:
+            continue
         fm, _, _ = parse_frontmatter(text)
         if unquote(fm.get("type", "")) != "initiative":
             continue
@@ -50,7 +54,9 @@ def run(*, dry_run: bool, force: bool) -> int:
         lambda: {"done": 0, "open": 0, "blocked": 0}
     )
     for path in iter_task_files(cfg):
-        text = path.read_text(encoding="utf-8")
+        text = read_board_text(path)
+        if text is None:
+            continue
         fm, _, _ = parse_frontmatter(text)
         if unquote(fm.get("type", "")) != "task":
             continue

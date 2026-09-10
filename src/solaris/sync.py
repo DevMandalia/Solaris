@@ -16,11 +16,13 @@ from solaris.core import (
     active_sprint,
     apply_lane,
     infer_lane,
+    iter_board_markdown,
     iter_task_files,
     load_config,
     normalize_lane,
     parse_frontmatter,
     project_from_path,
+    read_board_text,
     render_frontmatter,
     unquote,
 )
@@ -93,7 +95,9 @@ def backlog_sort_key(fm: dict[str, str]) -> tuple[int, int]:
 
 
 def sync_task_file(cfg: BoardConfig, path: Path, sprint_week: str) -> bool:
-    text = path.read_text(encoding="utf-8")
+    text = read_board_text(path)
+    if text is None:
+        return False
     fm, tags, body = parse_frontmatter(text)
     if unquote(fm.get("type", "")) != "task":
         return False
@@ -138,7 +142,9 @@ def migrate_lanes(cfg: BoardConfig | None = None) -> int:
     paths = iter_task_files(cfg)
     entries: list[tuple] = []
     for path in paths:
-        text = path.read_text(encoding="utf-8")
+        text = read_board_text(path)
+        if text is None:
+            continue
         fm, tags, body = parse_frontmatter(text)
         if unquote(fm.get("type", "")) != "task":
             continue
@@ -171,8 +177,10 @@ def migrate_lanes(cfg: BoardConfig | None = None) -> int:
 def move_tasks_to_project_folders(cfg: BoardConfig | None = None) -> int:
     cfg = cfg or _cfg()
     moved = 0
-    for path in list(cfg.tasks_dir.glob("*.md")):
-        text = path.read_text(encoding="utf-8")
+    for path in iter_board_markdown(cfg.tasks_dir, recursive=False):
+        text = read_board_text(path)
+        if text is None:
+            continue
         fm, _tags, _ = parse_frontmatter(text)
         project = unquote(fm.get("project", ""))
         folder = next(

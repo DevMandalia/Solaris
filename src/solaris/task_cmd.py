@@ -25,10 +25,12 @@ from solaris.core import (  # noqa: E402
     find_agent_plan,
     folder_for_project,
     infer_lane,
+    iter_board_markdown,
     iter_task_files,
     load_config,
     normalize_lane,
     parse_frontmatter,
+    read_board_text,
     render_frontmatter,
     slugify,
     unquote,
@@ -99,7 +101,7 @@ def cmd_create(args: argparse.Namespace) -> int:
     folder = folder_for_project(cfg, project)
     dest_dir = cfg.tasks_dir / folder
     dest_dir.mkdir(parents=True, exist_ok=True)
-    existing = {p.stem for p in dest_dir.glob("*.md")}
+    existing = {p.stem for p in iter_board_markdown(dest_dir, recursive=False)}
     slug = args.slug or slugify(args.title, existing)
     path = dest_dir / f"{slug}.md"
     if path.exists() and not args.force:
@@ -286,7 +288,9 @@ def cmd_list(args: argparse.Namespace) -> int:
     cfg = load_config()
     rows = []
     for path in iter_task_files(cfg):
-        text = path.read_text(encoding="utf-8")
+        text = read_board_text(path)
+        if text is None:
+            continue
         fm, _tags, _ = parse_frontmatter(text)
         if unquote(fm.get("type", "")) != "task":
             continue
